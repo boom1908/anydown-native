@@ -1,7 +1,7 @@
 package com.boom.anydown.ui
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.core.animation.animateFloatAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

@@ -48,6 +48,7 @@ fun AnydownApp() {
     var showError by remember { mutableStateOf(false) }
     val downloadVm: DownloadViewModel = viewModel()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Box(
         Modifier
@@ -105,7 +106,7 @@ fun AnydownApp() {
                         channel = screenState.channel,
                         onBack = { state = AnydownState.Idle; linkText = "" },
                         onDownload = { format ->
-                            downloadVm.startDownload(format, linkText, ffmpegPath = getFfmpegBinary(LocalContext.current))
+                            downloadVm.startDownload(format, linkText, ffmpegPath = getFfmpegBinary(context))
                         },
                         downloadingFormat = downloadVm.activeFormat,
                         downloadPercent = downloadVm.downloadPercent

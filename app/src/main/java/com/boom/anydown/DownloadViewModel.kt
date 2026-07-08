@@ -7,10 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.boom.anydown.ui.FormatType
 import com.chaquo.python.PyException
-import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+interface ProgressCallback {
+    fun onProgress(percent: Int, status: String)
+}
 
 class DownloadViewModel : DownloadViewModelParent() {
     var downloadPercent by mutableStateOf(0)
@@ -21,9 +24,8 @@ class DownloadViewModel : DownloadViewModelParent() {
     fun startDownload(format: FormatType, url: String, ffmpegPath: String) {
         activeFormat = format
         viewModelScope.launch(Dispatchers.IO) {
-            val callback = object : PyObject.PyProxy() {
-                @Suppress("unused")
-                fun onProgress(percent: Int, status: String) {
+            val callback = object : ProgressCallback {
+                override fun onProgress(percent: Int, status: String) {
                     viewModelScope.launch(Dispatchers.Main) {
                         downloadPercent = percent
                         if (status == "done") activeFormat = null
