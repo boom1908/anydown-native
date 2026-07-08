@@ -6,7 +6,7 @@ plugins {
     // This app doesn't use Kotlin directly, but some of the androidx dependencies
     // do, which causes "Duplicate class" errors when the plugin isn't present
     // (https://youtrack.jetbrains.com/issue/KT-55297).
-    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
 }
 
 task clean(type: Delete) {
