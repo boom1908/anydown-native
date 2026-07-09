@@ -9,12 +9,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 
 enum class FormatType { VIDEO, AUDIO, FAST }
 
@@ -22,6 +23,7 @@ enum class FormatType { VIDEO, AUDIO, FAST }
 fun ResultsScreen(
     title: String,
     channel: String,
+    thumbnailUrl: String,
     onBack: () -> Unit,
     onDownload: (FormatType) -> Unit,
     downloadingFormat: FormatType?,
@@ -38,10 +40,15 @@ fun ResultsScreen(
             .border(3.dp, AnydownColors.Ink, RoundedCornerShape(6.dp))
             .padding(14.dp)) {
 
-            Box(Modifier
-                .size(width = 128.dp, height = 84.dp)
-                .background(Brush.linearGradient(listOf(AnydownColors.Blue, AnydownColors.Green)), RoundedCornerShape(4.dp))
-                .border(2.dp, AnydownColors.Ink, RoundedCornerShape(4.dp)))
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(width = 128.dp, height = 84.dp)
+                    .background(AnydownColors.CardDark, RoundedCornerShape(4.dp))
+                    .border(2.dp, AnydownColors.Ink, RoundedCornerShape(4.dp))
+            )
 
             Spacer(Modifier.width(16.dp))
             Column(verticalArrangement = Arrangement.Center) {

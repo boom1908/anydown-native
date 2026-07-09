@@ -89,7 +89,7 @@ fun AnydownApp() {
                                     try {
                                         val info = fetchVideoInfo(linkText)
                                         scope.launch(Dispatchers.Main) {
-                                            state = AnydownState.Results(info.title, info.channel, info.duration)
+                                            state = AnydownState.Results(info.title, info.channel, info.duration, info.thumbnail)
                                         }
                                     } catch (e: Exception) {
                                         CrashLogger.log("FETCH ERROR: ${e.message}")
@@ -104,6 +104,7 @@ fun AnydownApp() {
                     ResultsScreen(
                         title = screenState.title,
                         channel = screenState.channel,
+                        thumbnailUrl = screenState.thumbnailUrl,
                         onBack = { state = AnydownState.Idle; linkText = "" },
                         onDownload = { format ->
                             val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: ""
