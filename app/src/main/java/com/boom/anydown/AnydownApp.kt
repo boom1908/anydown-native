@@ -39,7 +39,7 @@ fun fetchVideoInfo(url: String): AnydownVideoInfo {
     )
 }
 
-data class AnydownVideoInfo(val title: String, val channel: String, val duration: String)
+data class AnydownVideoInfo(val title: String, val channel: String, val duration: String, val thumbnail: String)
 
 @Composable
 fun AnydownApp() {
