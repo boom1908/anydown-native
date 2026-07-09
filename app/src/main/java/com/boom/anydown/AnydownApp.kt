@@ -35,7 +35,8 @@ fun fetchVideoInfo(url: String): AnydownVideoInfo {
     return AnydownVideoInfo(
         title = res[com.chaquo.python.PyObject.fromJava("title")]?.toString() ?: "Unknown Video",
         channel = res[com.chaquo.python.PyObject.fromJava("channel")]?.toString() ?: "Unknown Channel",
-        duration = res[com.chaquo.python.PyObject.fromJava("duration")]?.toString() ?: "0:00"
+        duration = res[com.chaquo.python.PyObject.fromJava("duration")]?.toString() ?: "0:00",
+        thumbnail = res[com.chaquo.python.PyObject.fromJava("thumbnail")]?.toString() ?: ""
     )
 }
 
