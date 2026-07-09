@@ -42,7 +42,7 @@ class DownloadViewModel(application: Application) : AndroidViewModel(application
             try {
                 val py = Python.getInstance()
                 // Python downloads to private storage and returns the final filepath
-                val resultPath = py.getModule("downloader").callAttr("fetch_video", url, ffmpegPath, outputDir, callback).toString()
+                val resultPath = py.getModule("downloader").callAttr("fetch_video", url, ffmpegPath, outputDir, format.name, callback).toString()
                 
                 // Copy the finished file to the public Downloads folder safely
                 saveToDownloads(context, File(resultPath))

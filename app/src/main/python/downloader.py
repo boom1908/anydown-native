@@ -14,7 +14,7 @@ def fetch_video_info(url):
             "thumbnail": info.get("thumbnail", "")
         }
 
-def fetch_video(url, ffmpeg_path, output_dir, callback):
+def fetch_video(url, ffmpeg_path, output_dir, format_type, callback):
     def progress_hook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_approx') or 0
@@ -24,11 +24,36 @@ def fetch_video(url, ffmpeg_path, output_dir, callback):
         elif d['status'] == 'finished':
             callback.onProgress(100, "done")
 
-    ydl_opts = {
+    base_opts = {
         'progress_hooks': [progress_hook],
         'ffmpeg_location': ffmpeg_path,
         'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
     }
+
+    if format_type == "VIDEO":
+        ydl_opts = {
+            **base_opts,
+            'format': 'bestvideo+bestaudio/best',
+            'merge_output_format': 'mp4',
+        }
+    elif format_type == "AUDIO":
+        ydl_opts = {
+            **base_opts,
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320',
+            }],
+        }
+    elif format_type == "FAST":
+        ydl_opts = {
+            **base_opts,
+            'format': 'best[height<=720][ext=mp4]/best[height<=720]',
+        }
+    else:
+        ydl_opts = {**base_opts, 'format': 'best'}
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         return ydl.prepare_filename(info)
