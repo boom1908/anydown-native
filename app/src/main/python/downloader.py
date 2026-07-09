@@ -10,10 +10,11 @@ def fetch_video_info(url):
         return {
             "title": info.get("title", "Unknown Video"),
             "channel": info.get("uploader", "Unknown Channel"),
-            "duration": str(info.get("duration", 0))
+            "duration": str(info.get("duration", 0)),
+            "thumbnail": info.get("thumbnail", "")
         }
 
-def fetch_video(url, ffmpeg_path, callback):
+def fetch_video(url, ffmpeg_path, output_dir, callback):
     def progress_hook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_approx') or 0
@@ -26,7 +27,8 @@ def fetch_video(url, ffmpeg_path, callback):
     ydl_opts = {
         'progress_hooks': [progress_hook],
         'ffmpeg_location': ffmpeg_path,
-        'outtmpl': '/storage/emulated/0/Download/%(title)s.%(ext)s',
+        'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(info)
