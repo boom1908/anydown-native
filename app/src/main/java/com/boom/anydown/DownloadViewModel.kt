@@ -1,25 +1,28 @@
 package com.boom.anydown
 
+import android.app.Application
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boom.anydown.ui.FormatType
 import com.chaquo.python.PyException
 import com.chaquo.python.Python
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 interface ProgressCallback {
     fun onProgress(percent: Int, status: String)
 }
 
-class DownloadViewModel : DownloadViewModelParent() {
+class DownloadViewModel(application: Application) : AndroidViewModel(application) {
     var downloadPercent by mutableStateOf(0)
         private set
     var activeFormat by mutableStateOf<FormatType?>(null)
@@ -44,7 +47,12 @@ class DownloadViewModel : DownloadViewModelParent() {
                 // Copy the finished file to the public Downloads folder safely
                 saveToDownloads(context, File(resultPath))
             } catch (e: PyException) {
+                // Log and surface the error to the UI
                 CrashLogger.log("PYTHON ERROR: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(getApplication(), "Python error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+                activeFormat = null
             }
         }
     }
@@ -68,5 +76,3 @@ class DownloadViewModel : DownloadViewModelParent() {
         }
     }
 }
-
-open class DownloadViewModelParent : ViewModel()
