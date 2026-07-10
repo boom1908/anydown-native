@@ -109,7 +109,7 @@ fun AnydownApp() {
                         onBack = { state = AnydownState.Idle; linkText = "" },
                         onDownload = { format ->
                             val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: ""
-                            downloadVm.startDownload(context = context, format = format, url = linkText, ffmpegPath = getFfmpegBinary(context), outputDir = outputDir)
+                            downloadVm.startDownload(context = context, format = format, url = linkText, ffmpegPath = getFfmpegBinDir(context), outputDir = outputDir)
                         },
                         downloadingFormat = downloadVm.activeFormat,
                         downloadPercent = downloadVm.downloadPercent

@@ -1,30 +1,19 @@
 package com.boom.anydown
 
 import android.content.Context
+import android.system.Os
 import java.io.File
-import java.io.FileOutputStream
 
-fun getFfmpegBinary(context: Context): String {
+fun getFfmpegBinDir(context: Context): String {
     val binDir = File(context.filesDir, "bin")
     if (!binDir.exists()) binDir.mkdirs()
 
-    val ffmpegFile = File(binDir, "ffmpeg")
-    val ffprobeFile = File(binDir, "ffprobe")
+    val nativeLibDir = context.applicationInfo.nativeLibraryDir
+    val ffmpegLink = File(binDir, "ffmpeg")
+    val ffprobeLink = File(binDir, "ffprobe")
 
-    if (!ffmpegFile.exists()) {
-        context.assets.open("ffmpeg").use { input ->
-            FileOutputStream(ffmpegFile).use { output -> input.copyTo(output) }
-        }
-        ffmpegFile.setExecutable(true)
-    }
+    if (!ffmpegLink.exists()) Os.symlink("$nativeLibDir/libffmpeg.so", ffmpegLink.absolutePath)
+    if (!ffprobeLink.exists()) Os.symlink("$nativeLibDir/libffprobe.so", ffprobeLink.absolutePath)
 
-    if (!ffprobeFile.exists()) {
-        context.assets.open("ffprobe").use { input ->
-            FileOutputStream(ffprobeFile).use { output -> input.copyTo(output) }
-        }
-        ffprobeFile.setExecutable(true)
-    }
-
-    // Return the directory containing both tools so yt-dlp can find them
     return binDir.absolutePath
 }
