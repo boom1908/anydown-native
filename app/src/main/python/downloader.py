@@ -42,7 +42,7 @@ def fetch_video(url, ffmpeg_path, output_dir, format_type, callback):
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
+                'preferredcodec': 'm4a',
                 'preferredquality': '320',
             }],
         }

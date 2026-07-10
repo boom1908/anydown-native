@@ -67,7 +67,7 @@ fun ResultsScreen(
         FormatCard(FormatType.VIDEO, "Video + Audio (Best Quality)", listOf("MP4", "Up to 4K", "~92 MB"),
             AnydownColors.Blue, downloadingFormat == FormatType.VIDEO, downloadPercent) { onDownload(FormatType.VIDEO) }
         Spacer(Modifier.height(14.dp))
-        FormatCard(FormatType.AUDIO, "Audio Only", listOf("MP3", "320 kbps", "~4.6 MB"),
+        FormatCard(FormatType.AUDIO, "Audio Only", listOf("M4A", "320 kbps", "~4.6 MB"),
             AnydownColors.Green, downloadingFormat == FormatType.AUDIO, downloadPercent) { onDownload(FormatType.AUDIO) }
         Spacer(Modifier.height(14.dp))
         FormatCard(FormatType.FAST, "Fast Download (Video + Audio)", listOf("MP4", "720p", "~28 MB", "Faster"),
