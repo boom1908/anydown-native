@@ -17,14 +17,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-internal data class AuraParticle(
+data class AuraParticle(
     val id: String,
     val start: Offset,
     val end: Offset,
     val color: Color
 )
 
-internal data class AuraSnapshot(val particle: AuraParticle, val t: Float)
+data class AuraSnapshot(val particle: AuraParticle, val t: Float)
 
 /**
  * Holds in-flight aura particles for the "fly from tapped format card to the
