@@ -125,7 +125,7 @@ fun AnydownApp(viewModel: AnydownViewModel = viewModel()) {
                                     color = AnydownColors.green,
                                     scope = scope
                                 )
-                                viewModel.onFormatSelected(format, state.video)
+                                viewModel.onFormatSelected(format, state.video, context)
                             },
                             onGrabAnother = viewModel::grabAnother
                         )

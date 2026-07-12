@@ -337,7 +337,7 @@ private fun FormatCard(
             Text(format.subtitle, color = AnydownColors.textMuted, fontSize = 11.sp)
         }
         Text(
-            text = format.approxSizeMb?.let { "Approx. $it MB" } ?: "Size unknown",
+            text = format.sizeText,
             color = AnydownColors.green,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold

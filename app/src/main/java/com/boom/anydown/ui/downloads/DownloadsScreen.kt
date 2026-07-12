@@ -138,7 +138,7 @@ private fun SwipeableDownloadRow(
                     .clickable { onOpen(item) }
             ) {
                 Text(item.title, color = AnydownColors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
-                Text("${item.sizeMb} MB", color = AnydownColors.textMuted, fontSize = 11.sp)
+                Text(text = if (item.status == com.boom.anydown.model.DownloadStatus.DOWNLOADING) "Downloading..." else "Completed", color = if (item.status == com.boom.anydown.model.DownloadStatus.DOWNLOADING) com.boom.anydown.ui.theme.AnydownColors.yellow else com.boom.anydown.ui.theme.AnydownColors.green, fontSize = 11.sp)
             }
         }
     }

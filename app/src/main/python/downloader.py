@@ -1,55 +1,54 @@
 import yt_dlp
 
+def _format_duration(seconds):
+    seconds = int(seconds or 0)
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
 def fetch_video_info(url):
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-    }
+    ydl_opts = {'quiet': True, 'no_warnings': True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         return {
             "title": info.get("title", "Unknown Video"),
-            "channel": info.get("uploader", "Unknown Channel"),
-            "duration": str(info.get("duration", 0)),
-            "thumbnail": info.get("thumbnail", "")
+            "thumbnailUrl": info.get("thumbnail", ""),
+            "durationText": _format_duration(info.get("duration", 0)),
+            "formats": [
+                {"id": "full", "label": "Video + Audio (Best Quality)",
+                 "subtitle": "Best available · MP4",
+                 "sizeText": "Size depends on the best quality available"},
+                {"id": "audio", "label": "Audio Only",
+                 "subtitle": "M4A", "sizeText": "5-10 MB"},
+                {"id": "fast", "label": "Fast Download",
+                 "subtitle": "720p · MP4", "sizeText": "< 50 MB"},
+            ]
         }
 
-def fetch_video(url, ffmpeg_path, output_dir, format_type, callback):
+def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
     def progress_hook(d):
         if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_approx') or 0
+            total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
             downloaded = d.get('downloaded_bytes', 0)
-            percent = int((downloaded / total) * 100) if total > 0 else 0
+            percent = int((downloaded / total) * 100) if total else 0
             callback.onProgress(percent, "downloading")
         elif d['status'] == 'finished':
-            callback.onProgress(100, "done")
+            callback.onProgress(100, "processing")
 
-    base_opts = {
+    base = {
         'progress_hooks': [progress_hook],
-        'ffmpeg_location': ffmpeg_path,
+        'ffmpeg_location': ffmpeg_dir,
         'outtmpl': f'{output_dir}/%(title)s.%(ext)s',
     }
 
-    if format_type == "VIDEO":
-        ydl_opts = {
-            **base_opts,
-            'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-        }
-    elif format_type == "AUDIO":
-        # Native M4A directly from YouTube, completely bypassing FFmpeg
-        ydl_opts = {
-            **base_opts,
-            'format': 'bestaudio[ext=m4a]/bestaudio',
-        }
-    elif format_type == "FAST":
-        ydl_opts = {
-            **base_opts,
-            'format': 'best[height<=720][ext=mp4]/best[height<=720]',
-        }
+    if format_type == "full":
+        opts = {**base, 'format': 'bestvideo+bestaudio/best', 'merge_output_format': 'mp4'}
+    elif format_type == "audio":
+        opts = {**base, 'format': 'bestaudio/best',
+                 'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '320'}]}
     else:
-        ydl_opts = {**base_opts, 'format': 'best'}
+        opts = {**base, 'format': 'best[height<=720][ext=mp4]/best[height<=720]'}
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
         return ydl.prepare_filename(info)
