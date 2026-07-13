@@ -24,7 +24,9 @@ class AnydownViewModel : ViewModel() {
     var homeState by mutableStateOf<HomeUiState>(HomeUiState.Idle())
         private set
     val downloads = mutableStateListOf<DownloadedItem>()
+    
     private var loadingJob: Job? = null
+    private val downloadJobs = mutableMapOf<String, Job>() // Tracks active yt-dlp jobs
 
     fun onLinkChanged(text: String) {
         val idle = homeState as? HomeUiState.Idle ?: return
@@ -88,7 +90,7 @@ class AnydownViewModel : ViewModel() {
         val itemId = UUID.randomUUID().toString()
         downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING, 0))
 
-        viewModelScope.launch(Dispatchers.IO) {
+        val job = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val py = Python.getInstance()
                 val ffmpegDir = getFfmpegBinDir(context)
@@ -121,9 +123,13 @@ class AnydownViewModel : ViewModel() {
                 CrashLogger.log("PYTHON ERROR (download): ${e.message}")
             }
         }
+        downloadJobs[itemId] = job // Track the job so it can be cancelled
     }
 
     fun deleteDownload(id: String, context: Context) {
+        downloadJobs[id]?.cancel() // Kill the background python download immediately
+        downloadJobs.remove(id)
+
         val item = downloads.find { it.id == id }
         if (item != null && item.filePath.isNotEmpty()) {
             try {
