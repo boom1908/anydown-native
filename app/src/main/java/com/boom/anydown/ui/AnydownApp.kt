@@ -134,7 +134,7 @@ fun AnydownApp(viewModel: AnydownViewModel = viewModel()) {
                 composable(ROUTE_DOWNLOADS) {
                     DownloadsScreen(
                         downloads = viewModel.downloads,
-                        onDelete = viewModel::deleteDownload,
+                        onDelete = { id -> viewModel.deleteDownload(id, context) },
                         onOpen = { item ->
                             // TODO: item.filePath is empty until the real backend
                             // writes an actual file — wire this to the real path.

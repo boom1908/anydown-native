@@ -1,6 +1,7 @@
 package com.boom.anydown.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -14,7 +15,6 @@ import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -86,7 +86,7 @@ class AnydownViewModel : ViewModel() {
 
     fun onFormatSelected(format: DownloadFormat, video: VideoResult, context: Context) {
         val itemId = UUID.randomUUID().toString()
-        downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING))
+        downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING, 0))
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -95,7 +95,15 @@ class AnydownViewModel : ViewModel() {
                 val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
 
                 val callback = object : ProgressCallback {
-                    override fun onProgress(percent: Int, status: String) {}
+                    override fun onProgress(percent: Int, status: String) {
+                        viewModelScope.launch(Dispatchers.Main) {
+                            val idx = downloads.indexOfFirst { it.id == itemId }
+                            if (idx != -1) {
+                                val currentStatus = if (status == "processing") DownloadStatus.PROCESSING else DownloadStatus.DOWNLOADING
+                                downloads[idx] = downloads[idx].copy(progress = percent, status = currentStatus)
+                            }
+                        }
+                    }
                 }
                 val resultPath = py.getModule("downloader")
                     .callAttr("fetch_video", video.sourceUrl, ffmpegDir, outputDir, format.id, callback)
@@ -107,7 +115,7 @@ class AnydownViewModel : ViewModel() {
 
                 withContext(Dispatchers.Main) {
                     val idx = downloads.indexOfFirst { it.id == itemId }
-                    if (idx != -1) downloads[idx] = downloads[idx].copy(filePath = uri, status = DownloadStatus.COMPLETED)
+                    if (idx != -1) downloads[idx] = downloads[idx].copy(filePath = uri, status = DownloadStatus.COMPLETED, progress = 100)
                 }
             } catch (e: PyException) {
                 CrashLogger.log("PYTHON ERROR (download): ${e.message}")
@@ -115,7 +123,15 @@ class AnydownViewModel : ViewModel() {
         }
     }
 
-    fun deleteDownload(id: String) {
+    fun deleteDownload(id: String, context: Context) {
+        val item = downloads.find { it.id == id }
+        if (item != null && item.filePath.isNotEmpty()) {
+            try {
+                context.contentResolver.delete(Uri.parse(item.filePath), null, null)
+            } catch (e: Exception) {
+                CrashLogger.log("Failed to delete file from disk: ${e.message}")
+            }
+        }
         downloads.removeAll { it.id == id }
     }
 

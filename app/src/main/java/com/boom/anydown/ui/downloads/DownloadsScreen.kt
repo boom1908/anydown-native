@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.boom.anydown.model.DownloadedItem
+import com.boom.anydown.model.DownloadStatus
 import com.boom.anydown.ui.brutalist.brutalistBox
 import com.boom.anydown.ui.brutalist.brutalistClickable
 import com.boom.anydown.ui.theme.AnydownColors
@@ -117,13 +118,9 @@ private fun SwipeableDownloadRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .brutalistBox(cornerRadius = 10.dp, shadowOffset = 4.dp)
-                .padding(10.dp)
-                .then(Modifier),
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // MOCK: thumbnailUrl/size come from the mock DownloadedItem added
-            // in AnydownViewModel.onFormatSelected(). Real filePath needed for
-            // the ACTION_VIEW intent in AnydownApp.kt to actually open anything.
             AsyncImage(
                 model = item.thumbnailUrl,
                 contentDescription = item.title,
@@ -135,10 +132,31 @@ private fun SwipeableDownloadRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onOpen(item) }
+                    .clickable(enabled = item.status == DownloadStatus.COMPLETED) { onOpen(item) }
             ) {
                 Text(item.title, color = AnydownColors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
-                Text(text = if (item.status == com.boom.anydown.model.DownloadStatus.DOWNLOADING) "Downloading..." else "Completed", color = if (item.status == com.boom.anydown.model.DownloadStatus.DOWNLOADING) com.boom.anydown.ui.theme.AnydownColors.yellow else com.boom.anydown.ui.theme.AnydownColors.green, fontSize = 11.sp)
+                
+                when (item.status) {
+                    DownloadStatus.DOWNLOADING -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Downloading... ${item.progress}%", color = AnydownColors.yellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = item.progress / 100f,
+                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                            color = AnydownColors.yellow,
+                            trackColor = AnydownColors.background
+                        )
+                    }
+                    DownloadStatus.PROCESSING -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Processing...", color = AnydownColors.blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    DownloadStatus.COMPLETED -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Completed", color = AnydownColors.green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
     }

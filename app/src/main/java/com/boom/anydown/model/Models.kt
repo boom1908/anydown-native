@@ -16,7 +16,7 @@ data class VideoResult(
     val formats: List<DownloadFormat>
 )
 
-enum class DownloadStatus { DOWNLOADING, COMPLETED }
+enum class DownloadStatus { DOWNLOADING, PROCESSING, COMPLETED }
 
 data class DownloadedItem(
     val id: String,
@@ -24,7 +24,8 @@ data class DownloadedItem(
     val thumbnailUrl: String,
     val sizeMb: Int,
     val filePath: String,
-    val status: DownloadStatus = DownloadStatus.DOWNLOADING
+    val status: DownloadStatus = DownloadStatus.DOWNLOADING,
+    val progress: Int = 0
 )
 
 sealed class HomeUiState {
