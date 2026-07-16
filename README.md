@@ -1,12 +1,22 @@
-# Chaquopy console app
+<div align="center">
+  <img src="anydown.png" alt="Anydown Logo" width="150"/>
+  <h1>Anydown</h1>
+  <p>A lightning-fast, native Android video & audio downloader powered by yt-dlp and FFmpeg.</p>
+</div>
 
-This is an example of an interactive Python console script running in an Android app using
-[Chaquopy](https://chaquo.com/chaquopy/). Some starting points:
+---
 
-* The example Python script is in 
-  [`app/src/main/python/main.py`](https://github.com/chaquo/chaquopy-console/blob/master/app/src/main/python/main.py).
-  You can replace this with your own code.
-* The Android activity which hosts it is in 
-  [`app/src/main/java/com/chaquo/python/console/MainActivity.java`](https://github.com/chaquo/chaquopy-console/blob/master/app/src/main/java/com/chaquo/python/console/MainActivity.java).
-* The Chaquopy configuration is in 
-  [`app/build.gradle`](https://github.com/chaquo/chaquopy-console/blob/master/app/build.gradle).
+## ⚡ Features
+* **Auto-Fetch:** Instantly detects YouTube links from your clipboard.
+* **Smart Formats:** Choose between Best Quality (Video + Audio), Audio Only (M4A), or Fast Download (720p).
+* **Native Performance:** Bypasses sluggish web wrappers by running Python and FFmpeg directly on your device via Chaquopy.
+* **Background Downloads:** Thread-safe, asynchronous downloading with a live UI progress bar.
+* **Brutalist UI:** A high-contrast, dark Neo-Brutalist interface built natively in Jetpack Compose.
+
+## 📥 Download
+You can download the latest version of Anydown directly from the [Releases Tab](../../releases).
+
+## 🤝 Credits & Team
+* **Lead Developer:** BOOM 
+* **UI & Logo Design:** xcaventure 
+* **Backend Architecture & Debugging:** Gemini & Claude
