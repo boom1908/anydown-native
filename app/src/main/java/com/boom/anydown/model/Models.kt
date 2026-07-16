@@ -16,7 +16,7 @@ data class VideoResult(
     val formats: List<DownloadFormat>
 )
 
-enum class DownloadStatus { DOWNLOADING, PROCESSING, COMPLETED }
+enum class DownloadStatus { DOWNLOADING, PROCESSING, COMPLETED, CANCELLED, FAILED }
 
 data class DownloadedItem(
     val id: String,

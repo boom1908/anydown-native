@@ -24,9 +24,10 @@ class AnydownViewModel : ViewModel() {
     var homeState by mutableStateOf<HomeUiState>(HomeUiState.Idle())
         private set
     val downloads = mutableStateListOf<DownloadedItem>()
-    
+
     private var loadingJob: Job? = null
-    private val downloadJobs = mutableMapOf<String, Job>() // Tracks active yt-dlp jobs
+    private val downloadJobs = mutableMapOf<String, Job>()
+    private val cancelledIds = mutableSetOf<String>()
 
     fun onLinkChanged(text: String) {
         val idle = homeState as? HomeUiState.Idle ?: return
@@ -35,9 +36,7 @@ class AnydownViewModel : ViewModel() {
 
     fun onClipboardLinkDetected(link: String) {
         val idle = homeState as? HomeUiState.Idle ?: return
-        if (idle.linkInput.isBlank()) {
-            homeState = idle.copy(clipboardSuggestion = link)
-        }
+        if (idle.linkInput.isBlank()) homeState = idle.copy(clipboardSuggestion = link)
     }
 
     fun acceptClipboardSuggestion() {
@@ -78,66 +77,138 @@ class AnydownViewModel : ViewModel() {
                     durationText = res[PyObject.fromJava("durationText")].toString(),
                     formats = formats
                 )
-                withContext(Dispatchers.Main) { homeState = HomeUiState.Result(video) }
+                withContext(Dispatchers.Main) {
+                    homeState = HomeUiState.Result(video)
+                }
             } catch (e: PyException) {
                 CrashLogger.log("PYTHON ERROR (fetchVideo): ${e.message}")
-                withContext(Dispatchers.Main) { homeState = HomeUiState.Idle(linkInput = idle.linkInput) }
+                withContext(Dispatchers.Main) {
+                    homeState = HomeUiState.Idle(linkInput = idle.linkInput)
+                }
             }
         }
     }
 
     fun onFormatSelected(format: DownloadFormat, video: VideoResult, context: Context) {
         val itemId = UUID.randomUUID().toString()
-        downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING, 0))
+        downloads.add(
+            0,
+            DownloadedItem(
+                itemId,
+                video.title,
+                video.thumbnailUrl,
+                0,
+                "",
+                DownloadStatus.DOWNLOADING,
+                0
+            )
+        )
 
         val job = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val py = Python.getInstance()
                 val ffmpegDir = getFfmpegBinDir(context)
-                val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
+                val outputDir = context.getExternalFilesDir(null)?.absolutePath
+                    ?: context.filesDir.absolutePath
 
                 val callback = object : ProgressCallback {
                     override fun onProgress(percent: Int, status: String) {
                         viewModelScope.launch(Dispatchers.Main) {
                             val idx = downloads.indexOfFirst { it.id == itemId }
                             if (idx != -1) {
-                                val currentStatus = if (status == "processing") DownloadStatus.PROCESSING else DownloadStatus.DOWNLOADING
-                                downloads[idx] = downloads[idx].copy(progress = percent, status = currentStatus)
+                                val currentStatus =
+                                    if (status == "processing")
+                                        DownloadStatus.PROCESSING
+                                    else
+                                        DownloadStatus.DOWNLOADING
+
+                                downloads[idx] = downloads[idx].copy(
+                                    progress = percent,
+                                    status = currentStatus
+                                )
                             }
                         }
                     }
+
+                    override fun isCancelled(): Boolean =
+                        cancelledIds.contains(itemId)
                 }
+
                 val resultPath = py.getModule("downloader")
-                    .callAttr("fetch_video", video.sourceUrl, ffmpegDir, outputDir, format.id, callback)
+                    .callAttr(
+                        "fetch_video",
+                        video.sourceUrl,
+                        ffmpegDir,
+                        outputDir,
+                        format.id,
+                        callback
+                    )
                     .toString()
 
                 val file = File(resultPath)
-                val mime = if (format.id == "audio") "audio/mp3" else "video/mp4"
+                val mime =
+                    if (format.id == "audio") "audio/m4a" else "video/mp4"
+
                 val uri = saveToDownloads(context, file, mime)
+
+                if (file.exists()) file.delete()
 
                 withContext(Dispatchers.Main) {
                     val idx = downloads.indexOfFirst { it.id == itemId }
-                    if (idx != -1) downloads[idx] = downloads[idx].copy(filePath = uri, status = DownloadStatus.COMPLETED, progress = 100)
+                    if (idx != -1) {
+                        downloads[idx] = downloads[idx].copy(
+                            filePath = uri,
+                            status = DownloadStatus.COMPLETED,
+                            progress = 100
+                        )
+                    }
                 }
             } catch (e: PyException) {
                 CrashLogger.log("PYTHON ERROR (download): ${e.message}")
+                withContext(Dispatchers.Main) {
+                    val idx = downloads.indexOfFirst { it.id == itemId }
+                    if (idx != -1) {
+                        val finalStatus =
+                            if (cancelledIds.contains(itemId))
+                                DownloadStatus.CANCELLED
+                            else
+                                DownloadStatus.FAILED
+
+                        downloads[idx] =
+                            downloads[idx].copy(status = finalStatus)
+                    }
+                }
+            } finally {
+                downloadJobs.remove(itemId)
+                cancelledIds.remove(itemId)
             }
         }
-        downloadJobs[itemId] = job // Track the job so it can be cancelled
+
+        downloadJobs[itemId] = job
+    }
+
+    fun cancelDownload(id: String) {
+        cancelledIds.add(id)
     }
 
     fun deleteDownload(id: String, context: Context) {
-        downloadJobs[id]?.cancel() // Kill the background python download immediately
-        downloadJobs.remove(id)
+        cancelDownload(id)
+        downloadJobs[id]?.cancel()
 
         val item = downloads.find { it.id == id }
+
         if (item != null && item.filePath.isNotEmpty()) {
             try {
-                context.contentResolver.delete(Uri.parse(item.filePath), null, null)
+                context.contentResolver.delete(
+                    Uri.parse(item.filePath),
+                    null,
+                    null
+                )
             } catch (e: Exception) {
                 CrashLogger.log("Failed to delete file from disk: ${e.message}")
             }
         }
+
         downloads.removeAll { it.id == id }
     }
 

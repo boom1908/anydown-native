@@ -145,6 +145,7 @@ fun AnydownApp(viewModel: AnydownViewModel = viewModel()) {
                             }
                             context.startActivity(Intent.createChooser(intent, "Open with"))
                         },
+                        onCancel = viewModel::cancelDownload,
                         onGrabAnother = {
                             // Global reset rule: jump to Home AND force IdleState.
                             viewModel.grabAnother()

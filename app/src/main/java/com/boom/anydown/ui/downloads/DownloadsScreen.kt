@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ fun DownloadsScreen(
     downloads: List<DownloadedItem>,
     onDelete: (String) -> Unit,
     onOpen: (DownloadedItem) -> Unit,
+    onCancel: (String) -> Unit,
     onGrabAnother: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().background(AnydownColors.background)) {
@@ -60,7 +62,7 @@ fun DownloadsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(downloads, key = { it.id }) { item ->
-                    SwipeableDownloadRow(item = item, onDelete = onDelete, onOpen = onOpen)
+                    SwipeableDownloadRow(item = item, onDelete = onDelete, onOpen = onOpen, onCancel = onCancel)
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
@@ -89,7 +91,8 @@ fun DownloadsScreen(
 private fun SwipeableDownloadRow(
     item: DownloadedItem,
     onDelete: (String) -> Unit,
-    onOpen: (DownloadedItem) -> Unit
+    onOpen: (DownloadedItem) -> Unit,
+    onCancel: (String) -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -150,12 +153,26 @@ private fun SwipeableDownloadRow(
                     }
                     DownloadStatus.PROCESSING -> {
                         Spacer(Modifier.height(4.dp))
-                        Text("Processing...", color = AnydownColors.blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Processing (Merging)...", color = AnydownColors.blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     DownloadStatus.COMPLETED -> {
                         Spacer(Modifier.height(4.dp))
                         Text("Completed", color = AnydownColors.green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
+                    DownloadStatus.CANCELLED -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Cancelled", color = AnydownColors.coral, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    DownloadStatus.FAILED -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Failed", color = AnydownColors.danger, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            
+            if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
+                IconButton(onClick = { onCancel(item.id) }) {
+                    Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = AnydownColors.coral)
                 }
             }
         }
