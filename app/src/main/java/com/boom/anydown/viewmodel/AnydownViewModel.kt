@@ -1,12 +1,13 @@
 package com.boom.anydown.viewmodel
 
+import android.app.Application
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boom.anydown.model.*
 import com.boom.anydown.util.*
@@ -20,31 +21,41 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
-class AnydownViewModel : ViewModel() {
+class AnydownViewModel(application: Application) : AndroidViewModel(application) {
     var homeState by mutableStateOf<HomeUiState>(HomeUiState.Idle())
         private set
     val downloads = mutableStateListOf<DownloadedItem>()
-
+    
     private var loadingJob: Job? = null
     private val downloadJobs = mutableMapOf<String, Job>()
     private val cancelledIds = mutableSetOf<String>()
+
+    init {
+        // Load history on startup. If any downloads were interrupted by killing the app, mark them FAILED.
+        val savedHistory = HistoryManager.load(application).map { item ->
+            if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
+                item.copy(status = DownloadStatus.FAILED, progress = 0)
+            } else item
+        }
+        downloads.addAll(savedHistory)
+        if (savedHistory.any { it.status == DownloadStatus.FAILED }) {
+            HistoryManager.save(application, downloads.toList())
+        }
+    }
 
     fun onLinkChanged(text: String) {
         val idle = homeState as? HomeUiState.Idle ?: return
         homeState = idle.copy(linkInput = text)
     }
-
     fun onClipboardLinkDetected(link: String) {
         val idle = homeState as? HomeUiState.Idle ?: return
         if (idle.linkInput.isBlank()) homeState = idle.copy(clipboardSuggestion = link)
     }
-
     fun acceptClipboardSuggestion() {
         val idle = homeState as? HomeUiState.Idle ?: return
         val link = idle.clipboardSuggestion ?: return
         homeState = idle.copy(linkInput = link, clipboardSuggestion = null)
     }
-
     fun dismissClipboardSuggestion() {
         val idle = homeState as? HomeUiState.Idle ?: return
         homeState = idle.copy(clipboardSuggestion = null)
@@ -77,90 +88,53 @@ class AnydownViewModel : ViewModel() {
                     durationText = res[PyObject.fromJava("durationText")].toString(),
                     formats = formats
                 )
-                withContext(Dispatchers.Main) {
-                    homeState = HomeUiState.Result(video)
-                }
+                withContext(Dispatchers.Main) { homeState = HomeUiState.Result(video) }
             } catch (e: PyException) {
                 CrashLogger.log("PYTHON ERROR (fetchVideo): ${e.message}")
-                withContext(Dispatchers.Main) {
-                    homeState = HomeUiState.Idle(linkInput = idle.linkInput)
-                }
+                withContext(Dispatchers.Main) { homeState = HomeUiState.Idle(linkInput = idle.linkInput) }
             }
         }
     }
 
     fun onFormatSelected(format: DownloadFormat, video: VideoResult, context: Context) {
         val itemId = UUID.randomUUID().toString()
-        downloads.add(
-            0,
-            DownloadedItem(
-                itemId,
-                video.title,
-                video.thumbnailUrl,
-                0,
-                "",
-                DownloadStatus.DOWNLOADING,
-                0
-            )
-        )
+        downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING, 0))
+        HistoryManager.save(getApplication(), downloads.toList())
 
         val job = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val py = Python.getInstance()
                 val ffmpegDir = getFfmpegBinDir(context)
-                val outputDir = context.getExternalFilesDir(null)?.absolutePath
-                    ?: context.filesDir.absolutePath
+                val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
 
                 val callback = object : ProgressCallback {
                     override fun onProgress(percent: Int, status: String) {
                         viewModelScope.launch(Dispatchers.Main) {
                             val idx = downloads.indexOfFirst { it.id == itemId }
                             if (idx != -1) {
-                                val currentStatus =
-                                    if (status == "processing")
-                                        DownloadStatus.PROCESSING
-                                    else
-                                        DownloadStatus.DOWNLOADING
-
-                                downloads[idx] = downloads[idx].copy(
-                                    progress = percent,
-                                    status = currentStatus
-                                )
+                                val currentStatus = if (status == "processing") DownloadStatus.PROCESSING else DownloadStatus.DOWNLOADING
+                                downloads[idx] = downloads[idx].copy(progress = percent, status = currentStatus)
                             }
                         }
                     }
-
-                    override fun isCancelled(): Boolean =
-                        cancelledIds.contains(itemId)
+                    override fun isCancelled(): Boolean = cancelledIds.contains(itemId)
                 }
-
+                
                 val resultPath = py.getModule("downloader")
-                    .callAttr(
-                        "fetch_video",
-                        video.sourceUrl,
-                        ffmpegDir,
-                        outputDir,
-                        format.id,
-                        callback
-                    )
+                    .callAttr("fetch_video", video.sourceUrl, ffmpegDir, outputDir, format.id, callback)
                     .toString()
 
                 val file = File(resultPath)
-                val mime =
-                    if (format.id == "audio") "audio/m4a" else "video/mp4"
-
+                val mime = if (format.id == "audio") "audio/m4a" else "video/mp4"
                 val uri = saveToDownloads(context, file, mime)
-
+                
                 if (file.exists()) file.delete()
 
                 withContext(Dispatchers.Main) {
                     val idx = downloads.indexOfFirst { it.id == itemId }
                     if (idx != -1) {
-                        downloads[idx] = downloads[idx].copy(
-                            filePath = uri,
-                            status = DownloadStatus.COMPLETED,
-                            progress = 100
-                        )
+                        downloads[idx] = downloads[idx].copy(filePath = uri, status = DownloadStatus.COMPLETED, progress = 100)
+                        HistoryManager.save(getApplication(), downloads.toList())
                     }
                 }
             } catch (e: PyException) {
@@ -168,14 +142,9 @@ class AnydownViewModel : ViewModel() {
                 withContext(Dispatchers.Main) {
                     val idx = downloads.indexOfFirst { it.id == itemId }
                     if (idx != -1) {
-                        val finalStatus =
-                            if (cancelledIds.contains(itemId))
-                                DownloadStatus.CANCELLED
-                            else
-                                DownloadStatus.FAILED
-
-                        downloads[idx] =
-                            downloads[idx].copy(status = finalStatus)
+                        val finalStatus = if (cancelledIds.contains(itemId)) DownloadStatus.CANCELLED else DownloadStatus.FAILED
+                        downloads[idx] = downloads[idx].copy(status = finalStatus)
+                        HistoryManager.save(getApplication(), downloads.toList())
                     }
                 }
             } finally {
@@ -183,7 +152,6 @@ class AnydownViewModel : ViewModel() {
                 cancelledIds.remove(itemId)
             }
         }
-
         downloadJobs[itemId] = job
     }
 
@@ -193,23 +161,18 @@ class AnydownViewModel : ViewModel() {
 
     fun deleteDownload(id: String, context: Context) {
         cancelDownload(id)
-        downloadJobs[id]?.cancel()
+        downloadJobs[id]?.cancel() 
 
         val item = downloads.find { it.id == id }
-
         if (item != null && item.filePath.isNotEmpty()) {
             try {
-                context.contentResolver.delete(
-                    Uri.parse(item.filePath),
-                    null,
-                    null
-                )
+                context.contentResolver.delete(Uri.parse(item.filePath), null, null)
             } catch (e: Exception) {
                 CrashLogger.log("Failed to delete file from disk: ${e.message}")
             }
         }
-
         downloads.removeAll { it.id == id }
+        HistoryManager.save(getApplication(), downloads.toList())
     }
 
     fun grabAnother() {
