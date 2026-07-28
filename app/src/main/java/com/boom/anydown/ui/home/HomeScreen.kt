@@ -167,7 +167,28 @@ fun HomeIdleContent(
 
         // Floating "know more about the developer" widget — pinned to the
         // bottom of the Home tab regardless of scroll position.
-        Box(
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+
+            Box(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .brutalistClickable(
+                        onClick = { uriHandler.openUri("https://anydown.vercel.app") },
+                        cornerRadius = 100.dp,
+                        shadowOffset = 4.dp,
+                        backgroundColor = AnydownColors.panel
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    "Check for updates",
+                    color = AnydownColors.textPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 18.dp)
