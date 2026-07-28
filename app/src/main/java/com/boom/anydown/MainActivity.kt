@@ -31,9 +31,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        checkClipboardForLinks()
+    // Wait for the window to actually be in focus before checking clipboard (Android 12+ requirement)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            checkClipboardForLinks()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -49,26 +52,31 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkClipboardForLinks() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        if (clipboard.hasPrimaryClip()) {
-            val clipData = clipboard.primaryClip
-            if (clipData != null && clipData.itemCount > 0) {
-                val text = clipData.getItemAt(0).text?.toString() ?: ""
-                
-                // Check if clipboard contains YouTube or Instagram links
-                if (text.contains("youtube.com") || text.contains("youtu.be") || 
-                    text.contains("instagram.com") || text.contains("instagr.am")) {
-                    extractAndSetUrl(text)
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+            if (clipboard.hasPrimaryClip()) {
+                val clipData = clipboard.primaryClip
+                if (clipData != null && clipData.itemCount > 0) {
+                    val text = clipData.getItemAt(0).text?.toString() ?: ""
+                    
+                    if (text.contains("youtube.com") || text.contains("youtu.be") || 
+                        text.contains("instagram.com") || text.contains("instagr.am")) {
+                        extractAndSetUrl(text)
+                    }
                 }
             }
+        } catch (e: Exception) {
+            // Ignore clipboard access errors on strict Android versions
         }
     }
 
     private fun extractAndSetUrl(text: String) {
-        val urlRegex = "(?i)\\b((?:https?://|www\\d{0,3}[.]|[a-z0-9.\\-]+[.][a-z]{2,4}/)(?:[^\\s()<>]+|\\((?:[^\\s()<>]+|\\([^\\s()<>]+\\))*\\))+(?:\\((?:[^\\s()<>]+|\\([^\\s()<>]+\\))*\\)|[^\\s`!()\\[\\]{};:'\".,<>?«»“”‘’]))".toRegex()
-        val match = urlRegex.find(text)
-        val url = match?.value ?: text
-
-        viewModel.onLinkChanged(url)
+        // Use Android's native web URL parser which handles complex symbols like '==' perfectly
+        val matcher = android.util.Patterns.WEB_URL.matcher(text)
+        if (matcher.find()) {
+            viewModel.onLinkChanged(matcher.group())
+        } else {
+            viewModel.onLinkChanged(text)
+        }
     }
 }
