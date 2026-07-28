@@ -38,7 +38,7 @@ fun HomeScreen(
         Spacer(Modifier.height(18.dp))
         Text("ANYDOWN", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = AnydownColors.Ink, fontFamily = SpaceGroteskFamily)
         Spacer(Modifier.height(8.dp))
-        Text("Download any YouTube video as full video, audio only, or a fast lightweight file.",
+        Text("Download YouTube videos, Shorts, and Instagram Reels as full video, audio only, or native audio.",
             fontSize = 15.sp, color = AnydownColors.Muted, lineHeight = 22.sp, fontFamily = SpaceGroteskFamily)
         Spacer(Modifier.height(24.dp))
 
@@ -55,7 +55,7 @@ fun HomeScreen(
                         value = linkText,
                         onValueChange = onLinkChange,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Paste YouTube video link here", color = Color(0xFF6D707E), fontFamily = SpaceGroteskFamily) },
+                        placeholder = { Text("Paste YouTube or Instagram link here", color = Color(0xFF6D707E), fontFamily = SpaceGroteskFamily) },
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,

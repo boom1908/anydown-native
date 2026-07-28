@@ -89,7 +89,7 @@ fun HomeIdleContent(
             Text("ANYDOWN", color = AnydownColors.textPrimary, fontWeight = FontWeight.Black, fontSize = 36.sp)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Download any YouTube video as full video, audio only, or a fast lightweight file.",
+                "Download YouTube videos, Shorts, and Instagram Reels as full video, audio only, or native audio.",
                 color = AnydownColors.textMuted,
                 fontSize = 14.5.sp,
                 lineHeight = 20.sp
@@ -124,7 +124,7 @@ fun HomeIdleContent(
                     .padding(horizontal = 16.dp, vertical = 15.dp)
             ) {
                 if (state.linkInput.isEmpty()) {
-                    Text("Paste YouTube video link here", color = AnydownColors.textMuted, fontSize = 13.5.sp)
+                    Text("Paste YouTube or Instagram link here", color = AnydownColors.textMuted, fontSize = 13.5.sp)
                 }
                 BasicTextField(
                     value = state.linkInput,
