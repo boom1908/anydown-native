@@ -1,7 +1,5 @@
 package com.boom.anydown
 
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -31,14 +29,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Wait for the window to actually be in focus before checking clipboard (Android 12+ requirement)
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            checkClipboardForLinks()
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleSharedLink(intent)
@@ -51,27 +41,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkClipboardForLinks() {
-        try {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-            if (clipboard.hasPrimaryClip()) {
-                val clipData = clipboard.primaryClip
-                if (clipData != null && clipData.itemCount > 0) {
-                    val text = clipData.getItemAt(0).text?.toString() ?: ""
-                    
-                    if (text.contains("youtube.com") || text.contains("youtu.be") || 
-                        text.contains("instagram.com") || text.contains("instagr.am")) {
-                        extractAndSetUrl(text)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore clipboard access errors on strict Android versions
-        }
-    }
-
     private fun extractAndSetUrl(text: String) {
-        // Use Android's native web URL parser which handles complex symbols like '==' perfectly
         val matcher = android.util.Patterns.WEB_URL.matcher(text)
         if (matcher.find()) {
             viewModel.onLinkChanged(matcher.group())

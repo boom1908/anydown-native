@@ -49,7 +49,7 @@ fun HomeIdleContent(
 
     LaunchedEffect(Unit) {
         val clip = clipboardManager.getText()?.text.orEmpty()
-        if (clip.contains("youtube.com") || clip.contains("youtu.be")) {
+        if (clip.contains("youtube.com") || clip.contains("youtu.be") || clip.contains("instagram.com") || clip.contains("instagr.am")) {
             onClipboardDetected(clip)
         }
     }
@@ -112,7 +112,7 @@ fun HomeIdleContent(
                 ) {
                     Icon(Icons.Filled.ContentPaste, contentDescription = null, tint = AnydownColors.green)
                     Spacer(Modifier.width(8.dp))
-                    Text("YT Link Detected. Tap to paste.", color = AnydownColors.textPrimary, fontSize = 12.5.sp)
+                    Text("Media Link Detected. Tap to paste.", color = AnydownColors.textPrimary, fontSize = 12.5.sp)
                 }
                 Spacer(Modifier.height(16.dp))
             }

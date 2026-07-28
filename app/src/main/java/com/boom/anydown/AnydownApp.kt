@@ -25,7 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 fun isValidYoutubeLink(url: String): Boolean {
-    return url.contains("youtube.com") || url.contains("youtu.be") || url.contains("shorts")
+    return url.contains("youtube.com") || url.contains("youtu.be") || url.contains("shorts") || url.contains("instagram.com") || url.contains("instagr.am")
 }
 
 fun fetchVideoInfo(url: String): AnydownVideoInfo {
