@@ -162,58 +162,11 @@ fun HomeIdleContent(
             }
 
             // extra bottom room so the floating widget never overlaps content
-            Spacer(Modifier.height(100.dp))
+            Spacer(Modifier.height(140.dp))
         }
 
-        // Floating "know more about the developer" widget — pinned to the
-        // bottom of the Home tab regardless of scroll position.
-        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-
-            Box(
-                modifier = Modifier
-                    .padding(bottom = 16.dp)
-                    .brutalistClickable(
-                        onClick = { uriHandler.openUri("https://anydown.vercel.app") },
-                        cornerRadius = 100.dp,
-                        shadowOffset = 4.dp,
-                        backgroundColor = AnydownColors.panel
-                    )
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Text(
-                    "Check for updates",
-                    color = AnydownColors.textPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            androidx.compose.foundation.layout.Column(
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-        ) {
-            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-            
-            Box(
-                modifier = androidx.compose.ui.Modifier
-                    .brutalistClickable(
-                        onClick = { uriHandler.openUri("https://anydown.vercel.app") },
-                        cornerRadius = 100.dp,
-                        shadowOffset = 4.dp,
-                        backgroundColor = AnydownColors.panel
-                    )
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                androidx.compose.material3.Text(
-                    "Check for updates",
-                    color = AnydownColors.textPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            
-            androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
-            
-            Column(
+        // Floating Footer: Check for Updates & Developer buttons pinned to bottom
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 18.dp),
@@ -259,24 +212,11 @@ fun HomeIdleContent(
                 )
             }
         }
-        },
-                    cornerRadius = 100.dp,
-                    shadowOffset = 4.dp,
-                    backgroundColor = AnydownColors.panel
-                )
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
-            Text(
-                "Know more about the developer",
-                color = AnydownColors.textMuted,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
 
+        // Toast message
         androidx.compose.animation.AnimatedVisibility(
             visible = showPortfolioToast,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 68.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 130.dp),
             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 3 },
             exit = androidx.compose.animation.fadeOut()
         ) {
@@ -306,8 +246,6 @@ fun HomeResultContent(
     ) {
         Spacer(Modifier.height(28.dp))
 
-        // MOCK: thumbnailUrl/title/durationText come from VideoResult, which
-        // is currently produced by AnydownViewModel.mockVideoResult().
         Box(
             modifier = Modifier
                 .fillMaxWidth()
