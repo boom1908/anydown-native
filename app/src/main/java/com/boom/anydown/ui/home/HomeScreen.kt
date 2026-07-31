@@ -213,12 +213,52 @@ fun HomeIdleContent(
             
             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
             
-            Box(
+            Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 18.dp)
-                .brutalistClickable(
-                    onClick = { showPortfolioToast = true }
+                .padding(bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            
+            Box(
+                modifier = Modifier
+                    .brutalistClickable(
+                        onClick = { uriHandler.openUri("https://anydown.vercel.app") },
+                        cornerRadius = 100.dp,
+                        shadowOffset = 4.dp,
+                        backgroundColor = AnydownColors.panel
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    "Check for updates",
+                    color = AnydownColors.textPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Box(
+                modifier = Modifier
+                    .brutalistClickable(
+                        onClick = { showPortfolioToast = true },
+                        cornerRadius = 100.dp,
+                        shadowOffset = 4.dp,
+                        backgroundColor = AnydownColors.panel
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    "Know more about the developer",
+                    color = AnydownColors.textMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
         },
                     cornerRadius = 100.dp,
                     shadowOffset = 4.dp,
