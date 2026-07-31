@@ -188,12 +188,38 @@ fun HomeIdleContent(
                 )
             }
 
+            androidx.compose.foundation.layout.Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        ) {
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .brutalistClickable(
+                        onClick = { uriHandler.openUri("https://anydown.vercel.app") },
+                        cornerRadius = 100.dp,
+                        shadowOffset = 4.dp,
+                        backgroundColor = AnydownColors.panel
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                androidx.compose.material3.Text(
+                    "Check for updates",
+                    color = AnydownColors.textPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            
+            androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+            
             Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 18.dp)
                 .brutalistClickable(
-                    onClick = { showPortfolioToast = true },
+                    onClick = { showPortfolioToast = true }
+        },
                     cornerRadius = 100.dp,
                     shadowOffset = 4.dp,
                     backgroundColor = AnydownColors.panel
