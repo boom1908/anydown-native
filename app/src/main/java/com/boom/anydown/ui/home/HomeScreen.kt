@@ -1,5 +1,13 @@
 package com.boom.anydown.ui.home
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.State
+import androidx.compose.runtime.DisposableEffect
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -46,6 +54,13 @@ fun HomeIdleContent(
 ) {
     val clipboardManager = LocalClipboardManager.current
     var showPortfolioToast by remember { mutableStateOf(false) }
+
+    val (isOnlineState, refreshConnectivity) = rememberConnectivityState()
+    val isOnline by isOnlineState
+    if (!isOnline) {
+        OfflineBlock(onRetry = refreshConnectivity)
+        return
+    }
 
     LaunchedEffect(Unit) {
         val clip = clipboardManager.getText()?.text.orEmpty()
@@ -367,5 +382,80 @@ private fun FormatCard(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+
+@Composable
+private fun rememberConnectivityState(): Pair<State<Boolean>, () -> Unit> {
+    val context = LocalContext.current
+    val cm = remember { context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
+    val isOnline = remember { mutableStateOf(currentConnectivityStatus(cm)) }
+
+    DisposableEffect(Unit) {
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) { isOnline.value = true }
+            override fun onLost(network: Network) { isOnline.value = currentConnectivityStatus(cm) }
+        }
+        cm.registerDefaultNetworkCallback(callback)
+        onDispose { cm.unregisterNetworkCallback(callback) }
+    }
+
+    val refresh: () -> Unit = { isOnline.value = currentConnectivityStatus(cm) }
+    return isOnline to refresh
+}
+
+private fun currentConnectivityStatus(cm: ConnectivityManager): Boolean {
+    val network = cm.activeNetwork ?: return false
+    val capabilities = cm.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+}
+
+@Composable
+private fun OfflineBlock(onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .brutalistBox(backgroundColor = AnydownColors.panel, borderColor = AnydownColors.ink)
+                .padding(28.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "YOU ARE OFFLINE",
+                    color = AnydownColors.coral,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 26.sp
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Anydown needs an internet connection to fetch videos.",
+                    color = AnydownColors.textMuted,
+                    fontSize = 13.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(Modifier.height(24.dp))
+
+                Box(
+                    modifier = Modifier
+                        .brutalistClickable(
+                            onClick = onRetry,
+                            backgroundColor = AnydownColors.yellow,
+                            borderColor = AnydownColors.ink
+                        )
+                        .padding(horizontal = 28.dp, vertical = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("RETRY", color = AnydownColors.onAccentDark, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                }
+            }
+        }
     }
 }
