@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.boom.anydown.ui.AnydownColors
-import com.boom.anydown.ui.home.HomeScreen
+import com.boom.anydown.ui.HomeScreen
 import com.boom.anydown.ui.ResultsScreen
 import com.chaquo.python.Python
 import kotlinx.coroutines.Dispatchers
