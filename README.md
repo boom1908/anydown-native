@@ -18,5 +18,5 @@ You can download the latest version of Anydown directly from the [Releases Tab](
 
 ## 🤝 Credits & Team
 * **Lead Developer:** BOOM 
-* **UI & Logo Design:** xcaventure 
+* **UI & Logo Design:** DOMINICBRUTT 
 * **Backend Architecture & Debugging:** Gemini & Claude
