@@ -4,11 +4,15 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.State
 import androidx.compose.runtime.DisposableEffect
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +23,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -27,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.TextStyle
@@ -50,10 +56,14 @@ fun HomeIdleContent(
     onFetch: () -> Unit,
     onClipboardDetected: (String) -> Unit,
     onAcceptClipboard: () -> Unit,
-    onDismissClipboard: () -> Unit
+    onDismissClipboard: () -> Unit,
+    onDebugLogsUnlocked: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     var showPortfolioToast by remember { mutableStateOf(false) }
+    var titleTapCount by remember { mutableIntStateOf(0) }
+    var lastTitleTapAt by remember { mutableLongStateOf(0L) }
 
     val (isOnlineState, refreshConnectivity) = rememberConnectivityState()
     val isOnline by isOnlineState
@@ -64,7 +74,7 @@ fun HomeIdleContent(
 
     LaunchedEffect(Unit) {
         val clip = clipboardManager.getText()?.text.orEmpty()
-        if (clip.contains("youtube.com") || clip.contains("youtu.be") || clip.contains("instagram.com") || clip.contains("instagr.am")) {
+        if (clip.contains("youtube.com") || clip.contains("youtu.be") || clip.contains("instagram.com") || clip.contains("instagr.am") || clip.contains("open.spotify.com")) {
             onClipboardDetected(clip)
         }
     }
@@ -101,10 +111,29 @@ fun HomeIdleContent(
             }
 
             Spacer(Modifier.height(16.dp))
-            Text("ANYDOWN", color = AnydownColors.textPrimary, fontWeight = FontWeight.Black, fontSize = 36.sp)
+            Text(
+                "ANYDOWN",
+                color = AnydownColors.textPrimary,
+                fontWeight = FontWeight.Black,
+                fontSize = 36.sp,
+                modifier = Modifier.clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - lastTitleTapAt > DEBUG_TAP_WINDOW_MS) titleTapCount = 0
+                    lastTitleTapAt = now
+                    titleTapCount++
+                    if (titleTapCount >= DEBUG_TAP_COUNT) {
+                        titleTapCount = 0
+                        Toast.makeText(context, "Debug mode unlocked", Toast.LENGTH_SHORT).show()
+                        onDebugLogsUnlocked()
+                    }
+                }
+            )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Download YouTube videos, Shorts, and Instagram Reels as full video, audio only, or native audio.",
+                "YouTube, Spotify, Instagram and 1,000+ sites — saved your way.",
                 color = AnydownColors.textMuted,
                 fontSize = 14.5.sp,
                 lineHeight = 20.sp
@@ -139,7 +168,7 @@ fun HomeIdleContent(
                     .padding(horizontal = 16.dp, vertical = 15.dp)
             ) {
                 if (state.linkInput.isEmpty()) {
-                    Text("Paste YouTube or Instagram link here", color = AnydownColors.textMuted, fontSize = 13.5.sp)
+                    Text("Drop your link here...", color = AnydownColors.textMuted, fontSize = 13.5.sp)
                 }
                 BasicTextField(
                     value = state.linkInput,
@@ -155,25 +184,82 @@ fun HomeIdleContent(
             val fetchInteractionSource = remember { MutableInteractionSource() }
             val fetchOffset by rememberPressedShadowOffset(fetchInteractionSource, restingOffset = 6.dp)
 
+            val infiniteTransition = rememberInfiniteTransition(label = "fetch_pulse")
+            val pulseAlpha by if (state.isLoading) {
+                infiniteTransition.animateFloat(
+                    initialValue = 0.82f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(650, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulse_alpha"
+                )
+            } else {
+                remember { mutableStateOf(1f) }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)
+                    .graphicsLayer { alpha = pulseAlpha }
                     .brutalistClickable(
                         onClick = onFetch,
                         cornerRadius = 10.dp,
-                        shadowOffset = fetchOffset,
+                        shadowOffset = if (state.isLoading) 2.dp else fetchOffset,
                         backgroundColor = AnydownColors.yellow,
                         enabled = !state.isLoading
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (state.isLoading) state.loadingStatusText else "FETCH",
-                    color = AnydownColors.onAccentDark,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (state.isLoading) 12.sp else 15.sp
-                )
+                if (state.isLoading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.5.dp,
+                            color = AnydownColors.onAccentDark
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = state.loadingStatusText,
+                            color = AnydownColors.onAccentDark,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "FETCH",
+                        color = AnydownColors.onAccentDark,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+
+            state.errorText?.let { error ->
+                Spacer(Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .brutalistBox(cornerRadius = 10.dp, shadowOffset = 4.dp, backgroundColor = AnydownColors.panel)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        error,
+                        color = AnydownColors.textPrimary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             // extra bottom room so the floating widget never overlaps content
@@ -200,7 +286,7 @@ fun HomeIdleContent(
                     .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 Text(
-                    "Check for updates",
+                    "What's new on web",
                     color = AnydownColors.textPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
@@ -245,6 +331,9 @@ fun HomeIdleContent(
         }
     }
 }
+
+private const val DEBUG_TAP_COUNT = 7
+private const val DEBUG_TAP_WINDOW_MS = 2_500L
 
 @Composable
 fun HomeResultContent(
@@ -372,16 +461,44 @@ private fun FormatCard(
             )
         }
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(format.label, color = AnydownColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(format.subtitle, color = AnydownColors.textMuted, fontSize = 11.sp)
+        // The label owns the whole remaining row width: subtitle and size text
+        // stack underneath it instead of competing for the same line, which is
+        // what used to squeeze the label down to one character per line on
+        // narrow/dense screens.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = true)
+                .widthIn(min = 0.dp)
+        ) {
+            Text(
+                text = format.label,
+                color = AnydownColors.textPrimary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                softWrap = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = format.subtitle,
+                color = AnydownColors.textMuted,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (format.sizeText.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = format.sizeText,
+                    color = AnydownColors.green,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
-        Text(
-            text = format.sizeText,
-            color = AnydownColors.green,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 

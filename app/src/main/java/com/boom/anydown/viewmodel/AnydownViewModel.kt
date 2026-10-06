@@ -2,45 +2,46 @@ package com.boom.anydown.viewmodel
 
 import android.app.Application
 import android.content.Context
-import android.net.Uri
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.boom.anydown.model.*
+import com.boom.anydown.service.DownloadQueue
 import com.boom.anydown.util.*
-import com.chaquo.python.PyException
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.util.UUID
 
 class AnydownViewModel(application: Application) : AndroidViewModel(application) {
     var homeState by mutableStateOf<HomeUiState>(HomeUiState.Idle())
         private set
-    val downloads = mutableStateListOf<DownloadedItem>()
-    
+
+    /**
+     * The download list now lives in the background service's queue, not in the
+     * ViewModel — the UI just observes it, so downloads keep running when this
+     * screen (or the whole app) goes away.
+     */
+    val downloads: StateFlow<List<DownloadedItem>> = DownloadQueue.items
+
+    /**
+     * Playlist selections, keyed by format id ("full" | "audio" | "fast").
+     * Each section keeps its own independent set of chosen video ids.
+     */
+    var playlistSelections by mutableStateOf<Map<String, Set<String>>>(emptyMap())
+        private set
+
     private var loadingJob: Job? = null
-    private val downloadJobs = mutableMapOf<String, Job>()
-    private val cancelledIds = mutableSetOf<String>()
 
     init {
-        // Load history on startup. If any downloads were interrupted by killing the app, mark them FAILED.
-        val savedHistory = HistoryManager.load(application).map { item ->
-            if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
-                item.copy(status = DownloadStatus.FAILED, progress = 0)
-            } else item
-        }
-        downloads.addAll(savedHistory)
-        if (savedHistory.any { it.status == DownloadStatus.FAILED }) {
-            HistoryManager.save(application, downloads.toList())
-        }
+        DownloadQueue.ensureLoaded(application)
     }
 
     fun onLinkChanged(text: String) {
@@ -65,12 +66,99 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
         val idle = homeState as? HomeUiState.Idle ?: return
         if (idle.linkInput.isBlank() || idle.isLoading) return
 
-        homeState = idle.copy(isLoading = true, loadingStatusText = "Waking up Python engine…")
+        homeState = idle.copy(isLoading = true, loadingStatusText = "Connecting to source…", errorText = null)
         loadingJob?.cancel()
         loadingJob = viewModelScope.launch(Dispatchers.IO) {
+            suspend fun status(text: String) = withContext(Dispatchers.Main) {
+                (homeState as? HomeUiState.Idle)?.let {
+                    homeState = it.copy(isLoading = true, loadingStatusText = text, errorText = null)
+                }
+            }
+
             try {
                 val py = Python.getInstance()
-                val res = py.getModule("downloader").callAttr("fetch_video_info", idle.linkInput).asMap()
+                val downloader = py.getModule("downloader")
+
+                // --- Spotify links (public data only, no API credentials) ---
+                val spotifyKind = downloader.callAttr("spotify_link_type", idle.linkInput).toString()
+
+                if (spotifyKind == "playlist" || spotifyKind == "album") {
+                    status("Analyzing Spotify collection…")
+                    // Some "albums" are a single song released as an album — those
+                    // should behave exactly like a track link. Anything else (or
+                    // any doubt at all) falls back to the explainer popup.
+                    val single = try {
+                        downloader.callAttr("resolve_spotify_collection_single", idle.linkInput)
+                    } catch (e: Throwable) {
+                        CrashLogger.log("Spotify collection probe failed: ${e.message}")
+                        null
+                    }
+                    if (single != null && single.toString() != "None") {
+                        status("Matching audio source…")
+                        val match = single.asMap().toSpotifyMatch(idle.linkInput)
+                        if (match.videoUrl.isNotBlank()) {
+                            withContext(Dispatchers.Main) { homeState = HomeUiState.SpotifyTrack(match) }
+                            return@launch
+                        }
+                    }
+                    // Safety net: record what the page actually looked like so a
+                    // missed single-song album can be diagnosed later. Internal
+                    // log only — never surfaced to the user.
+                    runCatching {
+                        CrashLogger.log(
+                            downloader.callAttr("spotify_collection_debug", idle.linkInput).toString()
+                        )
+                    }
+                    withContext(Dispatchers.Main) {
+                        homeState = HomeUiState.Idle(
+                            linkInput = idle.linkInput,
+                            spotifyCollectionKind = spotifyKind
+                        )
+                    }
+                    return@launch
+                }
+
+                if (spotifyKind == "track") {
+                    status("Locating Spotify track…")
+                    val m = downloader.callAttr("resolve_spotify_track", idle.linkInput).asMap()
+                    status("Matching audio source…")
+                    val match = m.toSpotifyMatch(idle.linkInput)
+                    withContext(Dispatchers.Main) { homeState = HomeUiState.SpotifyTrack(match) }
+                    return@launch
+                }
+
+                val isPlaylist = downloader.callAttr("is_playlist", idle.linkInput).toBoolean()
+
+                if (isPlaylist) {
+                    status("Scanning playlist items…")
+                    val res = downloader.callAttr("fetch_playlist_info", idle.linkInput).asMap()
+                    val entries = res[PyObject.fromJava("entries")]!!.asList().map { e ->
+                        val m = e.asMap()
+                        PlaylistEntry(
+                            id = m[PyObject.fromJava("id")].toString(),
+                            url = m[PyObject.fromJava("url")].toString(),
+                            title = m[PyObject.fromJava("title")].toString(),
+                            thumbnailUrl = m[PyObject.fromJava("thumbnailUrl")].toString(),
+                            durationText = m[PyObject.fromJava("durationText")].toString()
+                        )
+                    }
+                    if (entries.isEmpty()) throw IllegalStateException("empty playlist")
+                    val playlist = PlaylistResult(
+                        sourceUrl = idle.linkInput,
+                        title = res[PyObject.fromJava("title")].toString(),
+                        entries = entries,
+                        formats = defaultFormats()
+                    )
+                    withContext(Dispatchers.Main) {
+                        playlistSelections = emptyMap()
+                        homeState = HomeUiState.Playlist(playlist)
+                    }
+                    return@launch
+                }
+
+                // Single video — unchanged from before.
+                status("Extracting media streams…")
+                val res = downloader.callAttr("fetch_video_info", idle.linkInput).asMap()
                 val formatsRaw = res[PyObject.fromJava("formats")]!!.asList()
                 val formats = formatsRaw.map { f ->
                     val m = f.asMap()
@@ -89,94 +177,163 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
                     formats = formats
                 )
                 withContext(Dispatchers.Main) { homeState = HomeUiState.Result(video) }
-            } catch (e: PyException) {
-                CrashLogger.log("PYTHON ERROR (fetchVideo): ${e.message}")
-                withContext(Dispatchers.Main) { homeState = HomeUiState.Idle(linkInput = idle.linkInput) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                CrashLogger.log("FETCH FAILED: ${e.message}")
+                val message = friendlyError(e)
+                withContext(Dispatchers.Main) {
+                    homeState = HomeUiState.Idle(linkInput = idle.linkInput, errorText = message)
+                }
             }
         }
     }
 
+    /** Turns any failure into one clear, friendly line for the home screen. */
+    private fun friendlyError(e: Throwable): String {
+        val text = (generateSequence(e) { it.cause }
+            .mapNotNull { it.message }
+            .joinToString(" ")).lowercase()
+        return when {
+            listOf("timed out", "timeout", "unreachable", "network", "connection",
+                "resolve host", "urlerror", "temporary failure", "socket")
+                .any { text.contains(it) } ->
+                "Lost signal for a second 📡 — check your connection and retry."
+
+            listOf("unsupported url", "is not a valid url", "no video", "not available",
+                "private", "unavailable", "removed", "404", "does not exist",
+                "could not read", "no youtube match", "empty playlist", "unable to extract")
+                .any { text.contains(it) } ->
+                "Hmm, couldn't find anything there 🕵️ — double check the link and try again."
+
+            else -> "That one didn't work — give it another shot!"
+        }
+    }
+
+    private fun Map<PyObject, PyObject>.toSpotifyMatch(sourceUrl: String): SpotifyMatch {
+        fun str(key: String) = this[PyObject.fromJava(key)]?.toString().orEmpty()
+        return SpotifyMatch(
+            spotifyUrl = sourceUrl,
+            spotifyTitle = str("spotifyTitle"),
+            spotifyArtist = str("spotifyArtist"),
+            videoUrl = str("url"),
+            videoTitle = str("title"),
+            channel = str("channel"),
+            thumbnailUrl = str("thumbnailUrl"),
+            durationText = str("durationText")
+        )
+    }
+
+    /** Single-video download — now just a batch of one on the background queue. */
     fun onFormatSelected(format: DownloadFormat, video: VideoResult, context: Context) {
-        val itemId = UUID.randomUUID().toString()
-        downloads.add(0, DownloadedItem(itemId, video.title, video.thumbnailUrl, 0, "", DownloadStatus.DOWNLOADING, 0))
-        HistoryManager.save(getApplication(), downloads.toList())
+        DownloadQueue.enqueue(
+            context,
+            listOf(
+                DownloadRequest(
+                    id = UUID.randomUUID().toString(),
+                    url = video.sourceUrl,
+                    title = video.title,
+                    thumbnailUrl = video.thumbnailUrl,
+                    formatId = format.id
+                )
+            )
+        )
+    }
 
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val py = Python.getInstance()
-                val ffmpegDir = getFfmpegBinDir(context)
-                val outputDir = context.getExternalFilesDir(null)?.absolutePath ?: context.filesDir.absolutePath
+    fun dismissSpotifyCollectionDialog() {
+        val idle = homeState as? HomeUiState.Idle ?: return
+        homeState = idle.copy(spotifyCollectionKind = null)
+    }
 
-                val callback = object : ProgressCallback {
-                    override fun onProgress(percent: Int, status: String) {
-                        viewModelScope.launch(Dispatchers.Main) {
-                            val idx = downloads.indexOfFirst { it.id == itemId }
-                            if (idx != -1) {
-                                val currentStatus = if (status == "processing") DownloadStatus.PROCESSING else DownloadStatus.DOWNLOADING
-                                downloads[idx] = downloads[idx].copy(progress = percent, status = currentStatus)
-                            }
-                        }
-                    }
-                    override fun isCancelled(): Boolean = cancelledIds.contains(itemId)
-                }
-                
-                val resultPath = py.getModule("downloader")
-                    .callAttr("fetch_video", video.sourceUrl, ffmpegDir, outputDir, format.id, callback)
-                    .toString()
+    fun dismissError() {
+        val idle = homeState as? HomeUiState.Idle ?: return
+        homeState = idle.copy(errorText = null)
+    }
 
-                val file = File(resultPath)
-                val mime = if (format.id == "audio") "audio/m4a" else "video/mp4"
-                val uri = saveToDownloads(context, file, mime)
-                
-                if (file.exists()) file.delete()
+    /**
+     * Confirmed Spotify match — goes straight into the same queue as everything
+     * else, forced to "audio" since a Spotify link means the user wants the song.
+     */
+    fun downloadSpotifyMatch(match: SpotifyMatch, context: Context) {
+        DownloadQueue.enqueue(
+            context,
+            listOf(
+                DownloadRequest(
+                    id = UUID.randomUUID().toString(),
+                    url = match.videoUrl,
+                    title = match.videoTitle,
+                    thumbnailUrl = match.thumbnailUrl,
+                    formatId = "audio"
+                )
+            )
+        )
+    }
 
-                withContext(Dispatchers.Main) {
-                    val idx = downloads.indexOfFirst { it.id == itemId }
-                    if (idx != -1) {
-                        downloads[idx] = downloads[idx].copy(filePath = uri, status = DownloadStatus.COMPLETED, progress = 100)
-                        HistoryManager.save(getApplication(), downloads.toList())
-                    }
-                }
-            } catch (e: PyException) {
-                CrashLogger.log("PYTHON ERROR (download): ${e.message}")
-                withContext(Dispatchers.Main) {
-                    val idx = downloads.indexOfFirst { it.id == itemId }
-                    if (idx != -1) {
-                        val finalStatus = if (cancelledIds.contains(itemId)) DownloadStatus.CANCELLED else DownloadStatus.FAILED
-                        downloads[idx] = downloads[idx].copy(status = finalStatus)
-                        HistoryManager.save(getApplication(), downloads.toList())
-                    }
-                }
-            } finally {
-                downloadJobs.remove(itemId)
-                cancelledIds.remove(itemId)
+    // --- playlist selection ------------------------------------------------
+
+    fun selectedIds(formatId: String): Set<String> = playlistSelections[formatId].orEmpty()
+
+    fun selectedCount(formatId: String): Int = selectedIds(formatId).size
+
+    fun toggleSelection(formatId: String, entryId: String) {
+        val current = selectedIds(formatId)
+        val next = if (current.contains(entryId)) current - entryId else current + entryId
+        playlistSelections = playlistSelections + (formatId to next)
+    }
+
+    fun setSelection(formatId: String, ids: Set<String>) {
+        playlistSelections = playlistSelections + (formatId to ids)
+    }
+
+    fun totalSelected(): Int = playlistSelections.values.sumOf { it.size }
+
+    /**
+     * Gathers every selection across all three sections — each in its own
+     * quality — and hands the whole batch to the background queue.
+     */
+    fun downloadSelectedPlaylistItems(context: Context) {
+        val state = homeState as? HomeUiState.Playlist ?: return
+        val byId = state.playlist.entries.associateBy { it.id }
+
+        val requests = mutableListOf<DownloadRequest>()
+        state.playlist.formats.forEach { format ->
+            selectedIds(format.id).forEach { entryId ->
+                val entry = byId[entryId] ?: return@forEach
+                requests.add(
+                    DownloadRequest(
+                        id = UUID.randomUUID().toString(),
+                        url = entry.url,
+                        title = entry.title,
+                        thumbnailUrl = entry.thumbnailUrl,
+                        formatId = format.id
+                    )
+                )
             }
         }
-        downloadJobs[itemId] = job
+        if (requests.isEmpty()) return
+        DownloadQueue.enqueue(context, requests)
+        playlistSelections = emptyMap()
     }
+
+    // --- downloads list actions -------------------------------------------
 
     fun cancelDownload(id: String) {
-        cancelledIds.add(id)
+        DownloadQueue.cancel(getApplication(), id)
     }
 
     fun deleteDownload(id: String, context: Context) {
-        cancelDownload(id)
-        downloadJobs[id]?.cancel() 
-
-        val item = downloads.find { it.id == id }
-        if (item != null && item.filePath.isNotEmpty()) {
-            try {
-                context.contentResolver.delete(Uri.parse(item.filePath), null, null)
-            } catch (e: Exception) {
-                CrashLogger.log("Failed to delete file from disk: ${e.message}")
-            }
-        }
-        downloads.removeAll { it.id == id }
-        HistoryManager.save(getApplication(), downloads.toList())
+        DownloadQueue.remove(context, id)
     }
 
     fun grabAnother() {
         loadingJob?.cancel()
+        playlistSelections = emptyMap()
         homeState = HomeUiState.Idle()
     }
+
+    private fun defaultFormats() = listOf(
+        DownloadFormat("full", "Video + Audio (Best Quality)", "Best available · MP4", "Size depends on quality"),
+        DownloadFormat("audio", "Audio Only", "M4A", "5-10 MB each"),
+        DownloadFormat("fast", "Fast Download", "720p · MP4", "<50 MB each")
+    )
 }

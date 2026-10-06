@@ -1,0 +1,6 @@
+{
+  "name": "Anydown",
+  "description": "Universal Media & Audio Downloader with Neo-Brutalist design, Playlist support, Spotify downloader, and media converter tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

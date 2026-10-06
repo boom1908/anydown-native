@@ -7,8 +7,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +29,8 @@ import com.boom.anydown.ui.theme.AnydownColors
 @Composable
 fun DownloadsScreen(
     downloads: List<DownloadedItem>,
+    downloadLocation: String,
+    onChangeLocation: () -> Unit,
     onDelete: (String) -> Unit,
     onOpen: (DownloadedItem) -> Unit,
     onCancel: (String) -> Unit,
@@ -39,6 +44,42 @@ fun DownloadsScreen(
             fontSize = 22.sp,
             modifier = Modifier.padding(20.dp)
         )
+
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+                .brutalistBox(cornerRadius = 10.dp, shadowOffset = 3.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "DOWNLOAD & CONVERT LOCATION",
+                    color = AnydownColors.textMuted,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 9.sp
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    downloadLocation,
+                    color = AnydownColors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Same destination for all downloads & converted files",
+                    color = AnydownColors.textMuted,
+                    fontSize = 9.5.sp
+                )
+            }
+            TextButton(onClick = onChangeLocation) {
+                Text("CHANGE", color = AnydownColors.yellow, fontWeight = FontWeight.Black, fontSize = 11.sp)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
 
         if (downloads.isEmpty()) {
             Column(
@@ -138,11 +179,22 @@ private fun SwipeableDownloadRow(
                     .clickable(enabled = item.status == DownloadStatus.COMPLETED) { onOpen(item) }
             ) {
                 Text(item.title, color = AnydownColors.textPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
-                
+                Spacer(Modifier.height(5.dp))
+                FormatBadge(item.formatId)
+
                 when (item.status) {
+                    DownloadStatus.QUEUED -> {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Queued", color = AnydownColors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                     DownloadStatus.DOWNLOADING -> {
                         Spacer(Modifier.height(4.dp))
-                        Text("Downloading... ${item.progress}%", color = AnydownColors.yellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            item.stageText ?: "Downloading... ${item.progress}%",
+                            color = AnydownColors.yellow,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Spacer(Modifier.height(4.dp))
                         LinearProgressIndicator(
                             progress = item.progress / 100f,
@@ -150,14 +202,44 @@ private fun SwipeableDownloadRow(
                             color = AnydownColors.yellow,
                             trackColor = AnydownColors.background
                         )
+                        if (!item.statusDetail.isNullOrBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                item.statusDetail,
+                                color = AnydownColors.textMuted,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                     DownloadStatus.PROCESSING -> {
                         Spacer(Modifier.height(4.dp))
-                        Text("Processing (Merging)...", color = AnydownColors.blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            item.stageText ?: "Merging audio & video with FFmpeg...",
+                            color = AnydownColors.blue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                            color = AnydownColors.blue,
+                            trackColor = AnydownColors.background
+                        )
+                        if (!item.statusDetail.isNullOrBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                item.statusDetail,
+                                color = AnydownColors.textMuted,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                     DownloadStatus.COMPLETED -> {
                         Spacer(Modifier.height(4.dp))
-                        Text("Completed", color = AnydownColors.green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        val completedText = if (item.sizeMb > 0) "Completed · ${item.sizeMb} MB" else "Completed"
+                        Text(completedText, color = AnydownColors.green, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     DownloadStatus.CANCELLED -> {
                         Spacer(Modifier.height(4.dp))
@@ -166,15 +248,45 @@ private fun SwipeableDownloadRow(
                     DownloadStatus.FAILED -> {
                         Spacer(Modifier.height(4.dp))
                         Text("Failed", color = AnydownColors.danger, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            item.failureReason ?: "Something went wrong with this one — give it another try",
+                            color = AnydownColors.textMuted,
+                            fontSize = 10.5.sp,
+                            lineHeight = 14.sp
+                        )
                     }
                 }
             }
             
-            if (item.status == DownloadStatus.DOWNLOADING || item.status == DownloadStatus.PROCESSING) {
+            if (item.status == DownloadStatus.DOWNLOADING ||
+                item.status == DownloadStatus.PROCESSING ||
+                item.status == DownloadStatus.QUEUED
+            ) {
+
                 IconButton(onClick = { onCancel(item.id) }) {
                     Icon(Icons.Filled.Close, contentDescription = "Cancel", tint = AnydownColors.coral)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FormatBadge(formatId: String?) {
+    val (label, accent, icon) = when (formatId) {
+        "audio" -> Triple("AUDIO ONLY", AnydownColors.green, Icons.Filled.MusicNote)
+        "fast" -> Triple("FAST DOWNLOAD", AnydownColors.coral, Icons.Filled.Bolt)
+        else -> Triple("BEST QUALITY", AnydownColors.blue, Icons.Filled.Movie)
+    }
+
+    Row(
+        modifier = Modifier
+            .background(accent, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = AnydownColors.onAccentDark, modifier = Modifier.size(12.dp))
+        Text(label, color = AnydownColors.onAccentDark, fontSize = 9.sp, fontWeight = FontWeight.Black)
     }
 }

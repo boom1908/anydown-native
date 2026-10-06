@@ -1,29 +1,15 @@
 package com.boom.anydown
 
 import android.content.Context
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
+/**
+ * Compatibility facade for older package-local callers. The file-backed
+ * implementation lives in util.CrashLogger so the service, ViewModel, and UI
+ * all read and write the same log.
+ */
 object CrashLogger {
-    private lateinit var logFile: File
-
-    fun init(context: Context) {
-        logFile = File(context.filesDir, "anydown_log.txt")
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
-            log("FATAL: ${throwable.stackTraceToString()}")
-        }
-    }
-
-    fun log(message: String) {
-        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-        logFile.appendText("[$timestamp] $message\n")
-    }
-
-    fun readLogs(): String = if (logFile.exists()) logFile.readText() else "No logs yet."
-
-    fun clear() {
-        if (logFile.exists()) logFile.writeText("")
-    }
+    fun init(context: Context) = com.boom.anydown.util.CrashLogger.init(context)
+    fun log(message: String) = com.boom.anydown.util.CrashLogger.log(message)
+    suspend fun readLogs(): String = com.boom.anydown.util.CrashLogger.readLogs()
+    fun clear() = com.boom.anydown.util.CrashLogger.clear()
 }

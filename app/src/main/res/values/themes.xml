@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Dark launch window so the system splash matches the in-app canvas
+        instead of flashing a plain/white background behind the icon.
+    -->
+    <style name="Theme.Anydown" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/anydown_background</item>
+    </style>
+</resources>
