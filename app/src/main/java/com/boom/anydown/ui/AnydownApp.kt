@@ -207,14 +207,14 @@ fun AnydownApp(viewModel: AnydownViewModel = viewModel()) {
                         }
                         is HomeUiState.SpotifyTrack -> SpotifyMatchContent(
                             match = state.match,
-                            onProceed = { startOffset ->
+                            onProceed = { formatId, startOffset ->
                                 auraController.fire(
                                     start = startOffset,
                                     end = downloadsTabPosition,
-                                    color = AnydownColors.green,
+                                    color = if (formatId == "mp3") AnydownColors.yellow else AnydownColors.green,
                                     scope = scope
                                 )
-                                viewModel.downloadSpotifyMatch(state.match, context)
+                                viewModel.downloadSpotifyMatch(state.match, context, formatId)
                                 viewModel.grabAnother()
                             },
                             onGrabAnother = viewModel::grabAnother
@@ -285,13 +285,16 @@ fun AnydownApp(viewModel: AnydownViewModel = viewModel()) {
                         onDelete = { id -> viewModel.deleteDownload(id, context) },
                         onOpen = { item ->
                             val uri = Uri.parse(item.filePath)
+                            val mimeType = if (item.formatId == "audio" || item.formatId == "mp3") "audio/*" else "video/*"
                             val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "video/*")
+                                setDataAndType(uri, mimeType)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
                             context.startActivity(Intent.createChooser(intent, "Open with"))
                         },
                         onCancel = viewModel::cancelDownload,
+                        onRetryItem = { id -> viewModel.retryItem(id, context) },
+                        onRetryBatch = { batchId -> viewModel.retryBatchFailed(batchId, context) },
                         onGrabAnother = {
                             // Global reset rule: jump to Home AND force IdleState.
                             viewModel.grabAnother()

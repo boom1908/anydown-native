@@ -33,7 +33,11 @@ def _format_duration(seconds):
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 def fetch_video_info(url):
-    ydl_opts = {'quiet': True, 'no_warnings': True}
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+    }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         return {
@@ -43,9 +47,11 @@ def fetch_video_info(url):
             "formats": [
                 {"id": "full", "label": "Video + Audio (Best Quality)",
                  "subtitle": "Best available · MP4",
-                 "sizeText": "Size depends on the best quality available"},
-                {"id": "audio", "label": "Audio Only",
-                 "subtitle": "M4A", "sizeText": "5-10 MB"},
+                 "sizeText": "Size depends on best quality"},
+                {"id": "audio", "label": "Audio Only (M4A)",
+                 "subtitle": "Fast · M4A (AAC)", "sizeText": "5-10 MB"},
+                {"id": "mp3", "label": "Audio Only (MP3)",
+                 "subtitle": "Universal · 192 kbps MP3", "sizeText": "5-10 MB"},
                 {"id": "fast", "label": "Fast Download",
                  "subtitle": "720p · MP4", "sizeText": "<50 MB"},
             ]
@@ -139,7 +145,10 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
                     stage_text = f"Step 1/2: Downloading {quality_label} video"
                     report(percent, "downloading_video", stage_text, size_detail, downloaded, total, speed)
             elif format_type == "audio":
-                stage_text = "Downloading audio"
+                stage_text = "Downloading audio (M4A)"
+                report(percent, "downloading_audio", stage_text, size_detail, downloaded, total, speed)
+            elif format_type == "mp3":
+                stage_text = "Downloading audio track"
                 report(percent, "downloading_audio", stage_text, size_detail, downloaded, total, speed)
             else:
                 stage_text = "Downloading video (720p)"
@@ -147,17 +156,27 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
 
         elif status == 'finished':
             downloaded = d.get('downloaded_bytes', 0)
-            if format_type == "full" and not stream_tracker["seen_audio"]:
-                report(100, "video_finished", "Step 1/2 finished · Preparing audio...", f"{_format_bytes(downloaded)} video ready", downloaded, downloaded, 0)
+            if format_type == "full":
+                if not stream_tracker["seen_audio"]:
+                    report(100, "video_finished", "Step 1/2 finished · Preparing audio...", f"{_format_bytes(downloaded)} video ready", downloaded, downloaded, 0)
+                else:
+                    report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", downloaded, downloaded, 0)
+            elif format_type == "mp3":
+                report(100, "processing", "Converting audio to MP3 with FFmpeg...", "Generating 192kbps MP3", downloaded, downloaded, 0)
             else:
-                report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", downloaded, downloaded, 0)
+                report(100, "finished", "Download complete · Saving to folder...", f"{_format_bytes(downloaded)} ready", downloaded, downloaded, 0)
 
     def postprocessor_hook(d):
         if callback.isCancelled():
             raise DownloadCancelled("User cancelled")
         pp_status = d.get('status')
         if pp_status == 'started':
-            report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", 0, 0, 0)
+            if format_type == "full":
+                report(100, "merging", "Merging video & audio with FFmpeg...", "Finalizing MP4 file", 0, 0, 0)
+            elif format_type == "mp3":
+                report(100, "processing", "Converting audio to MP3 with FFmpeg...", "Generating 192kbps MP3", 0, 0, 0)
+            else:
+                report(100, "finished", "Finalizing file...", "", 0, 0, 0)
 
     base = {
         'progress_hooks': [progress_hook],
@@ -170,18 +189,43 @@ def fetch_video(url, ffmpeg_dir, output_dir, format_type, callback):
         'retries': 10,
         'fragment_retries': 10,
         'extractor_retries': 3,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+            }
+        },
     }
 
     if format_type == "full":
         opts = {**base, 'format': 'bestvideo+bestaudio/best', 'merge_output_format': 'mp4'}
+    elif format_type == "mp3":
+        opts = {
+            **base,
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': f'{output_dir}/%(title)s_audio.%(ext)s',
+        }
     elif format_type == "audio":
-        opts = {**base, 'format': 'bestaudio[ext=m4a]/bestaudio'}
+        opts = {**base, 'format': 'bestaudio[ext=m4a]/bestaudio', 'outtmpl': f'{output_dir}/%(title)s_audio.%(ext)s'}
     else:
         opts = {**base, 'format': 'best[height<=720][ext=mp4]/best[height<=720]'}
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        return ydl.prepare_filename(info)
+        prepared = ydl.prepare_filename(info)
+        if format_type == "mp3":
+            base_name = os.path.splitext(prepared)[0]
+            mp3_cand = base_name + ".mp3"
+            if os.path.exists(mp3_cand):
+                return mp3_cand
+            cand2 = prepared.rsplit('.', 1)[0] + '.mp3'
+            if os.path.exists(cand2):
+                return cand2
+        return prepared
 
 
 # ---------------------------------------------------------------------------

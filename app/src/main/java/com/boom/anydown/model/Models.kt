@@ -46,19 +46,24 @@ data class DownloadedItem(
     val formatId: String? = "full",
     val failureReason: String? = null,
     val stageText: String? = null,
-    val statusDetail: String? = null
+    val statusDetail: String? = null,
+    val url: String? = null,
+    val batchId: String? = null,
+    val batchTitle: String? = null
 )
 
 /**
  * A single unit of work handed to the background download service.
- * `formatId` is one of "full" | "audio" | "fast" — the same ids downloader.py accepts.
+ * `formatId` is one of "full" | "audio" | "mp3" | "fast" — the same ids downloader.py accepts.
  */
 data class DownloadRequest(
     val id: String,
     val url: String,
     val title: String,
     val thumbnailUrl: String,
-    val formatId: String
+    val formatId: String,
+    val batchId: String? = null,
+    val batchTitle: String? = null
 )
 
 /**

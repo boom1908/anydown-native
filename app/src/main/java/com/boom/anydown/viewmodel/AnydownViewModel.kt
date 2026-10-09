@@ -251,10 +251,9 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Confirmed Spotify match — goes straight into the same queue as everything
-     * else, forced to "audio" since a Spotify link means the user wants the song.
+     * Confirmed Spotify match — user chooses M4A or MP3.
      */
-    fun downloadSpotifyMatch(match: SpotifyMatch, context: Context) {
+    fun downloadSpotifyMatch(match: SpotifyMatch, context: Context, formatId: String = "audio") {
         DownloadQueue.enqueue(
             context,
             listOf(
@@ -263,7 +262,7 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
                     url = match.videoUrl,
                     title = match.videoTitle,
                     thumbnailUrl = match.thumbnailUrl,
-                    formatId = "audio"
+                    formatId = formatId
                 )
             )
         )
@@ -288,12 +287,14 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
     fun totalSelected(): Int = playlistSelections.values.sumOf { it.size }
 
     /**
-     * Gathers every selection across all three sections — each in its own
-     * quality — and hands the whole batch to the background queue.
+     * Gathers every selection across sections — each in its own
+     * quality — and hands the whole batch to the background queue with a batch ID.
      */
     fun downloadSelectedPlaylistItems(context: Context) {
         val state = homeState as? HomeUiState.Playlist ?: return
         val byId = state.playlist.entries.associateBy { it.id }
+        val batchId = UUID.randomUUID().toString()
+        val batchTitle = state.playlist.title
 
         val requests = mutableListOf<DownloadRequest>()
         state.playlist.formats.forEach { format ->
@@ -305,7 +306,9 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
                         url = entry.url,
                         title = entry.title,
                         thumbnailUrl = entry.thumbnailUrl,
-                        formatId = format.id
+                        formatId = format.id,
+                        batchId = batchId,
+                        batchTitle = batchTitle
                     )
                 )
             }
@@ -325,6 +328,14 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
         DownloadQueue.remove(context, id)
     }
 
+    fun retryItem(id: String, context: Context) {
+        DownloadQueue.retryItem(context, id)
+    }
+
+    fun retryBatchFailed(batchId: String, context: Context) {
+        DownloadQueue.retryBatchFailed(context, batchId)
+    }
+
     fun grabAnother() {
         loadingJob?.cancel()
         playlistSelections = emptyMap()
@@ -333,7 +344,8 @@ class AnydownViewModel(application: Application) : AndroidViewModel(application)
 
     private fun defaultFormats() = listOf(
         DownloadFormat("full", "Video + Audio (Best Quality)", "Best available · MP4", "Size depends on quality"),
-        DownloadFormat("audio", "Audio Only", "M4A", "5-10 MB each"),
+        DownloadFormat("audio", "Audio Only (M4A)", "Fast · M4A (AAC)", "5-10 MB each"),
+        DownloadFormat("mp3", "Audio Only (MP3)", "Universal · 192 kbps MP3", "5-10 MB each"),
         DownloadFormat("fast", "Fast Download", "720p · MP4", "<50 MB each")
     )
 }

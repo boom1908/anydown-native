@@ -76,8 +76,9 @@ android {
 val assembleNativeLibs by tasks.registering {
   doLast {
     val jniTarget = file("src/main/jniLibs/arm64-v8a/libffmpeg.so")
+    val jniLibCpp = file("src/main/jniLibs/arm64-v8a/libc++_shared.so")
+    val partsDir = file("src/main/native-parts/arm64-v8a")
     if (!jniTarget.exists() || jniTarget.length() == 0L) {
-      val partsDir = file("src/main/native-parts/arm64-v8a")
       val parts = partsDir.listFiles { _, name -> name.startsWith("libffmpeg.so.part-") }?.sortedBy { it.name }
       if (!parts.isNullOrEmpty()) {
         jniTarget.parentFile.mkdirs()
@@ -85,6 +86,11 @@ val assembleNativeLibs by tasks.registering {
           parts.forEach { part -> part.inputStream().use { it.copyTo(out) } }
         }
       }
+    }
+    val partsLibCpp = File(partsDir, "libc++_shared.so")
+    if ((!jniLibCpp.exists() || jniLibCpp.length() == 0L) && partsLibCpp.exists()) {
+      jniLibCpp.parentFile.mkdirs()
+      partsLibCpp.copyTo(jniLibCpp, overwrite = true)
     }
   }
 }

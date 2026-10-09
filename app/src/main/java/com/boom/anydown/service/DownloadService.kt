@@ -205,7 +205,11 @@ class DownloadService : Service() {
                 .toString()
 
             val file = File(resultPath)
-            val mime = if (request.formatId == "audio") "audio/m4a" else "video/mp4"
+            val mime = when (request.formatId) {
+                "mp3" -> "audio/mpeg"
+                "audio" -> "audio/m4a"
+                else -> "video/mp4"
+            }
             val uri = saveToDownloads(this, file, mime)
             val sizeMb = if (file.exists()) (file.length() / (1024 * 1024)).toInt() else 0
             if (file.exists()) file.delete()
@@ -244,6 +248,11 @@ class DownloadService : Service() {
             .mapNotNull { it.message }
             .joinToString(" ")
             .lowercase()
+
+        if (text.contains("403") || text.contains("forbidden")) {
+            return "Stream temporarily throttled by server (HTTP 403) — tap Retry to download"
+        }
+
         val formatUnavailable = listOf(
             "requested format is not available",
             "format is not available",
@@ -257,6 +266,7 @@ class DownloadService : Service() {
         }
 
         return when (request.formatId) {
+            "mp3" -> "MP3 isn't available for this video — try M4A instead"
             "audio" -> "Audio Only isn't available for this video — try Best Quality or Fast Download instead"
             "fast" -> "Fast Download isn't available for this video — try Best Quality or Audio Only instead"
             else -> "Best Quality isn't available for this video — try Audio Only or Fast Download instead"

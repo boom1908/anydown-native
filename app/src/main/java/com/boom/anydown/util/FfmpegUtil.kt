@@ -76,6 +76,12 @@ private fun ensureBinDir(context: Context, sourcePath: String) {
                     ffprobeDest.setExecutable(true, false)
                 }
             }
+
+            val libCppNative = File(context.applicationInfo.nativeLibraryDir, "libc++_shared.so")
+            val libCppDest = File(binDir, "libc++_shared.so")
+            if (!libCppNative.exists() && (!libCppDest.exists() || libCppDest.length() == 0L)) {
+                extractFromApk(context, "libc++_shared.so", libCppDest)
+            }
         }
     }
 }

@@ -32,10 +32,11 @@ import com.boom.anydown.ui.theme.AnydownColors
 @Composable
 fun SpotifyMatchContent(
     match: SpotifyMatch,
-    onProceed: (Offset) -> Unit,
+    onProceed: (formatId: String, Offset) -> Unit,
     onGrabAnother: () -> Unit
 ) {
-    var buttonCenter by remember { mutableStateOf(Offset.Zero) }
+    var m4aButtonCenter by remember { mutableStateOf(Offset.Zero) }
+    var mp3ButtonCenter by remember { mutableStateOf(Offset.Zero) }
 
     Column(
         modifier = Modifier
@@ -128,7 +129,7 @@ fun SpotifyMatchContent(
 
         Spacer(Modifier.height(10.dp))
         Text(
-            "Downloads as Audio Only (M4A) — that's the point of a Spotify link.",
+            "Choose your audio format — saved straight to your selected storage folder:",
             color = AnydownColors.textMuted,
             fontSize = 12.sp,
             lineHeight = 17.sp
@@ -141,24 +142,69 @@ fun SpotifyMatchContent(
                 .fillMaxWidth()
                 .onGloballyPositioned {
                     val bounds = it.boundsInWindow()
-                    buttonCenter = Offset(bounds.center.x, bounds.center.y)
+                    m4aButtonCenter = Offset(bounds.center.x, bounds.center.y)
                 }
                 .brutalistClickable(
-                    onClick = { onProceed(buttonCenter) },
+                    onClick = { onProceed("audio", m4aButtonCenter) },
                     cornerRadius = 10.dp,
                     shadowOffset = 6.dp,
                     backgroundColor = AnydownColors.green
                 )
-                .padding(vertical = 15.dp),
+                .padding(vertical = 14.dp, horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                "PROCEED · GET AUDIO",
-                color = AnydownColors.onAccentDark,
-                fontWeight = FontWeight.Black,
-                fontSize = 14.sp,
-                letterSpacing = 1.sp
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "GET AUDIO · M4A (FAST)",
+                    color = AnydownColors.onAccentDark,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 13.5.sp,
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Original AAC stream · No re-encoding needed",
+                    color = AnydownColors.onAccentDark.copy(alpha = 0.85f),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned {
+                    val bounds = it.boundsInWindow()
+                    mp3ButtonCenter = Offset(bounds.center.x, bounds.center.y)
+                }
+                .brutalistClickable(
+                    onClick = { onProceed("mp3", mp3ButtonCenter) },
+                    cornerRadius = 10.dp,
+                    shadowOffset = 6.dp,
+                    backgroundColor = AnydownColors.yellow
+                )
+                .padding(vertical = 14.dp, horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "GET AUDIO · MP3 (UNIVERSAL)",
+                    color = AnydownColors.onAccentDark,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 13.5.sp,
+                    letterSpacing = 1.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Converted with FFmpeg · Compatible with all players",
+                    color = AnydownColors.onAccentDark.copy(alpha = 0.85f),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))

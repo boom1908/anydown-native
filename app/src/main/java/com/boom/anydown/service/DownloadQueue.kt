@@ -95,7 +95,10 @@ object DownloadQueue {
                 filePath = "",
                 status = DownloadStatus.QUEUED,
                 progress = 0,
-                formatId = it.formatId
+                formatId = it.formatId,
+                url = it.url,
+                batchId = it.batchId,
+                batchTitle = it.batchTitle
             )
         }
         _items.value = newItems.reversed() + _items.value
@@ -215,5 +218,46 @@ object DownloadQueue {
         val updated = _items.value.filterNot { it.id == id }
         _items.value = updated
         HistoryManager.save(context.applicationContext, updated)
+    }
+
+    fun retryItem(context: Context, id: String) {
+        val item = _items.value.find { it.id == id } ?: return
+        val targetUrl = item.url ?: return
+        val newId = java.util.UUID.randomUUID().toString()
+        val request = DownloadRequest(
+            id = newId,
+            url = targetUrl,
+            title = item.title,
+            thumbnailUrl = item.thumbnailUrl,
+            formatId = item.formatId ?: "audio",
+            batchId = item.batchId,
+            batchTitle = item.batchTitle
+        )
+        // Remove old failed item
+        val updated = _items.value.filterNot { it.id == id }
+        _items.value = updated
+        HistoryManager.save(context.applicationContext, updated)
+        enqueue(context, listOf(request))
+    }
+
+    fun retryBatchFailed(context: Context, batchId: String) {
+        val failed = _items.value.filter { it.batchId == batchId && it.status == DownloadStatus.FAILED && !it.url.isNullOrBlank() }
+        if (failed.isEmpty()) return
+        val failedIds = failed.map { it.id }.toSet()
+        val requests = failed.map { item ->
+            DownloadRequest(
+                id = java.util.UUID.randomUUID().toString(),
+                url = item.url!!,
+                title = item.title,
+                thumbnailUrl = item.thumbnailUrl,
+                formatId = item.formatId ?: "audio",
+                batchId = item.batchId,
+                batchTitle = item.batchTitle
+            )
+        }
+        val updated = _items.value.filterNot { failedIds.contains(it.id) }
+        _items.value = updated
+        HistoryManager.save(context.applicationContext, updated)
+        enqueue(context, requests)
     }
 }

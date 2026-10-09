@@ -431,6 +431,7 @@ private fun FormatCard(
     val accent = when (format.id) {
         "full" -> AnydownColors.blue
         "audio" -> AnydownColors.green
+        "mp3" -> AnydownColors.yellow
         else -> AnydownColors.coral
     }
 

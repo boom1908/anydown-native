@@ -28,6 +28,7 @@ import com.boom.anydown.ui.theme.AnydownColors
 fun accentForFormat(formatId: String): Color = when (formatId) {
     "full" -> AnydownColors.blue
     "audio" -> AnydownColors.green
+    "mp3" -> AnydownColors.yellow
     else -> AnydownColors.coral
 }
 
